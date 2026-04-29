@@ -1816,3 +1816,85 @@ tr.subtotal:hover td, tr.subtotal-deep:hover td, tr.subtotal-deep3:hover td { fi
 .wizard-preview-table td { padding: 6px 9px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
 .wizard-preview-table tbody tr:nth-child(even) td { background: var(--panel-alt); }
 .wizard-preview-table tbody tr:hover td { background: var(--panel-hover); }
+
+/* ===== 快速查错 / 数据体检模态框 ===== */
+.health-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  background: rgba(0,0,0,0.45); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+}
+.health-modal {
+  background: var(--panel); border: 1px solid var(--border-strong);
+  border-radius: 14px; width: 760px; max-width: 94vw; max-height: 88vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+}
+.health-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+}
+.health-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.health-close {
+  background: none; border: none; font-size: 20px; cursor: pointer;
+  color: var(--text-muted); width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+}
+.health-close:hover { background: var(--panel-hover); color: var(--text); }
+.health-summary {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+}
+.health-summary.health-pass { background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%); }
+[data-theme="dark"] .health-summary.health-pass { background: linear-gradient(135deg, #1b3a1e 0%, #1a2f15 100%); }
+.health-summary.health-fail { background: linear-gradient(135deg, #fff3e0 0%, #fce4ec 100%); }
+[data-theme="dark"] .health-summary.health-fail { background: linear-gradient(135deg, #3a2010 0%, #3a1520 100%); }
+.health-summary-icon { font-size: 24px; }
+.health-summary-text { font-size: 15px; font-weight: 700; color: var(--text); }
+.health-summary-stats { font-size: 12px; color: var(--text-muted); }
+.health-summary-time { font-size: 11px; color: var(--text-dim); margin-left: auto; }
+.health-body { flex: 1; overflow-y: auto; padding: 12px 20px; max-height: 54vh; }
+.health-empty { text-align: center; padding: 40px 0; color: var(--text-dim); font-size: 15px; }
+.health-group { margin-bottom: 14px; }
+.health-group-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.health-group-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.health-badge {
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+}
+.health-badge.error { background: #ffcdd2; color: #c62828; }
+[data-theme="dark"] .health-badge.error { background: #5c2828; color: #ff8a80; }
+.health-badge.warning { background: #fff9c4; color: #e65100; }
+[data-theme="dark"] .health-badge.warning { background: #4a3a10; color: #ffb74d; }
+.health-issue-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 10px; margin: 2px 0; border-radius: 8px;
+  font-size: 12.5px; line-height: 1.5;
+}
+.health-issue-row.health-row-error { background: #fff5f5; border-left: 3px solid #e53935; }
+[data-theme="dark"] .health-issue-row.health-row-error { background: #2a1818; border-left-color: #ef5350; }
+.health-issue-row.health-row-warning { background: #fffde7; border-left: 3px solid #ff9800; }
+[data-theme="dark"] .health-issue-row.health-row-warning { background: #2a2518; border-left-color: #ffa726; }
+.health-issue-row.health-row-clickable { cursor: pointer; }
+.health-issue-row.health-row-clickable:hover { filter: brightness(0.95); }
+[data-theme="dark"] .health-issue-row.health-row-clickable:hover { filter: brightness(1.2); }
+.health-issue-icon { flex-shrink: 0; font-size: 14px; margin-top: 1px; }
+.health-issue-msg { flex: 1; color: var(--text); }
+.health-issue-tip {
+  font-size: 11px; color: var(--text-dim); flex-shrink: 0;
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.health-issue-nav {
+  flex-shrink: 0; font-size: 11px; color: var(--accent); font-weight: 600;
+  white-space: nowrap; opacity: 0.7;
+}
+.health-issue-row:hover .health-issue-nav { opacity: 1; }
+.health-footer {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 20px; border-top: 1px solid var(--border);
+}
+.health-hint { font-size: 11px; color: var(--text-dim); flex: 1; }
+.health-footer .btn { white-space: nowrap; }

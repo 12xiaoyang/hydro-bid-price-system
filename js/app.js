@@ -96,8 +96,103 @@ function evaluateFormulaSafe(expr, row) {
   if (typeof result === 'boolean') return result ? 1 : 0;
   throw new Error('公式结果无效');
 }
-function generateDataHealthReport() { const issues = []; const add = (level, code, message, suggestion) => issues.push({ level, code, message, suggestion: suggestion || '' }); const sidebar = captureSidebarState(); if (!sidebar.projectName) add('warning','PROJECT_NAME_EMPTY','项目名称为空','建议补充项目名称，便于导出和归档'); if ((parseFloat(sidebar.unitCount) || 0) <= 0) add('error','UNIT_COUNT_INVALID','机组台数必须大于 0','请在左侧项目信息中填写有效台数'); PROJECT_DATA_KEYS.forEach(k => { if (!Array.isArray(DATA[k])) { add('error','TABLE_INVALID', k + ' 不是有效数组','请重新导入或恢复默认数据'); return; } DATA[k].forEach((row, idx) => { if (!row || typeof row !== 'object') add('error','ROW_INVALID', k + ' 第 ' + (idx+1) + ' 行不是对象'); if (row && 'amount' in row && row.amount !== null && row.amount !== '' && isNaN(parseFloat(row.amount))) add('error','AMOUNT_INVALID', k + ' 第 ' + (idx+1) + ' 行金额不是数字'); if (row && 'total' in row && row.total !== null && row.total !== '' && isNaN(parseFloat(row.total))) add('error','TOTAL_INVALID', k + ' 第 ' + (idx+1) + ' 行合计不是数字'); if (row && 'weight' in row && parseFloat(row.weight) < 0) add('warning','WEIGHT_NEGATIVE', k + ' 第 ' + (idx+1) + ' 行重量为负数'); if (row && 'amount' in row && parseFloat(row.amount) < 0) add('warning','AMOUNT_NEGATIVE', k + ' 第 ' + (idx+1) + ' 行金额为负数'); }); }); ['water','gen','valve','valve_door'].forEach(k => { if (typeof validateTableConsistency === 'function') { try { validateTableConsistency(k).forEach(x => add('warning','SUBTOTAL_INCONSISTENT', k + ' 汇总行 ' + (x.seq || x.idx) + ' 与子项合计不一致','可点击“修复汇总”或“一键修复所有不一致”')); } catch(e) {} } }); if (!state.scenarios || !Array.isArray(state.scenarios)) add('warning','SCENARIOS_INVALID','方案数据不是数组','系统会在下次保存方案时修复'); const errorCount = issues.filter(x=>x.level==='error').length; const warningCount = issues.filter(x=>x.level==='warning').length; return { passed: errorCount === 0, summary: { errorCount, warningCount, totalCount: issues.length }, issues, checkedAt: new Date().toISOString() }; }
-function showDataHealthReport(report) { const r = report || generateDataHealthReport(); const lines = []; lines.push('数据体检报告：' + (r.passed ? '通过' : '未通过')); lines.push('错误 ' + r.summary.errorCount + ' 个，警告 ' + r.summary.warningCount + ' 个，总计 ' + r.summary.totalCount + ' 项'); lines.push('检查时间：' + r.checkedAt); if (r.issues.length) { lines.push(''); r.issues.slice(0, 60).forEach((x, i) => lines.push((i+1) + '. [' + (x.level === 'error' ? '错误' : '警告') + '] ' + x.message + (x.suggestion ? '\n   建议：' + x.suggestion : ''))); if (r.issues.length > 60) lines.push('... 其余 ' + (r.issues.length - 60) + ' 项已省略'); } alert(lines.join('\n')); }
+function _rowContext(row) {
+  if (!row) return '';
+  const parts = [];
+  if (row.seq !== null && row.seq !== undefined && String(row.seq).trim()) parts.push('序号' + String(row.seq).trim());
+  if (row.name && String(row.name).trim()) parts.push(String(row.name).trim().substring(0, 20));
+  if (row.spec && String(row.spec).trim()) parts.push(String(row.spec).trim().substring(0, 15));
+  if (row.material && String(row.material).trim()) parts.push(String(row.material).trim().substring(0, 15));
+  if (row.model && String(row.model).trim()) parts.push(String(row.model).trim().substring(0, 15));
+  return parts.join(' · ');
+}
+
+function generateDataHealthReport() { const issues = []; const fn = (row, k) => ' → [' + _rowContext(row) + ']'; const add = (level, code, message, suggestion, tableKey, rowIdx, ctx) => issues.push({ level, code, message: message + (ctx || ''), suggestion: suggestion || '', tableKey: tableKey || '', rowIdx: rowIdx !== undefined ? rowIdx : -1 }); const sidebar = captureSidebarState(); if (!sidebar.projectName) add('warning','PROJECT_NAME_EMPTY','项目名称为空','建议补充项目名称，便于导出和归档'); if ((parseFloat(sidebar.unitCount) || 0) <= 0) add('error','UNIT_COUNT_INVALID','机组台数必须大于 0','请在左侧项目信息中填写有效台数'); const BOM_KEYS = ['water','gen','valve','valve_door']; const PARTS_KEYS = ['water_parts','gen_parts','valve_parts']; const TOOLS_KEYS = ['water_tools','gen_tools','valve_tools']; const ALL_TABLES = PROJECT_DATA_KEYS; ALL_TABLES.forEach(k => { if (!Array.isArray(DATA[k])) { add('error','TABLE_INVALID', k + ' 不是有效数组','请重新导入或恢复默认数据', k, -1); return; } if (DATA[k].length === 0) return; DATA[k].forEach((row, idx) => { if (!row || typeof row !== 'object') { add('error','ROW_INVALID', k + ' 第 ' + (idx+1) + ' 行不是对象', '', k, idx); return; } const ctx = fn(row, k); const hasName = row.name && String(row.name).trim() !== ''; const hasSeq = row.seq !== null && row.seq !== undefined && String(row.seq).trim() !== ''; if (BOM_KEYS.includes(k) || PARTS_KEYS.includes(k) || TOOLS_KEYS.includes(k)) { if (!hasName && !hasSeq) { const hasAnyData = Object.values(row).some(v => v !== null && v !== undefined && String(v).trim() !== '' && String(v) !== '0'); if (hasAnyData) add('error','MISSING_BOTH', k + ' 第 ' + (idx+1) + ' 行缺少序号和名称' + ctx,'请补充序号或名称，或删除空行', k, idx); } else if (!hasName) { add('error','MISSING_NAME', k + ' 第 ' + (idx+1) + ' 行缺少名称' + ctx,'请补充名称', k, idx); } else if (!hasSeq) { add('warning','MISSING_SEQ', k + ' 第 ' + (idx+1) + ' 行缺少序号' + ctx,'建议补充序号', k, idx); } } if (['automation','monitoring'].includes(k)) { const hasFunc = row.function && String(row.function).trim() !== ''; if (!hasName && !hasFunc) { const hasAnyData = Object.values(row).some(v => v !== null && v !== undefined && String(v).trim() !== '' && String(v) !== '0'); if (hasAnyData) add('error','MISSING_NAME_FUNC', k + ' 第 ' + (idx+1) + ' 行缺少名称和功能' + ctx, '', k, idx); } } if (row && 'amount' in row && row.amount !== null && row.amount !== '' && isNaN(parseFloat(row.amount))) add('error','AMOUNT_INVALID', k + ' 第 ' + (idx+1) + ' 行金额不是数字' + ctx,'请修正为有效数字', k, idx); if (row && 'total' in row && row.total !== null && row.total !== '' && isNaN(parseFloat(row.total))) add('error','TOTAL_INVALID', k + ' 第 ' + (idx+1) + ' 行合计不是数字' + ctx,'请修正为有效数字', k, idx); if (row && 'weight' in row && parseFloat(row.weight) < 0) add('warning','WEIGHT_NEGATIVE', k + ' 第 ' + (idx+1) + ' 行重量为负数' + ctx,'请修正', k, idx); if (row && 'amount' in row && parseFloat(row.amount) < 0) add('warning','AMOUNT_NEGATIVE', k + ' 第 ' + (idx+1) + ' 行金额为负数' + ctx,'请修正', k, idx); if (row && 'usage' in row && row.usage !== null && row.usage !== undefined && row.usage !== '') { const u = parseFloat(row.usage); if (!isNaN(u) && (u < 0 || u > 1)) add('warning','USAGE_INVALID', k + ' 第 ' + (idx+1) + ' 行利用率不在0-1范围' + ctx,'利用率应在0-1之间', k, idx); } if (row && 'qty' in row && row.qty !== null && row.qty !== undefined && row.qty !== '') { const q = parseFloat(row.qty); if (isNaN(q) && isNaN(Date.parse(row.qty))) add('warning','QTY_INVALID', k + ' 第 ' + (idx+1) + ' 行数量不是有效数字' + ctx,'建议只填数字', k, idx); } if (hasSeq) { const dupIdx = DATA[k].findIndex((r, i) => i !== idx && r && String(r.seq || '').trim() === String(row.seq).trim()); if (dupIdx >= 0 && dupIdx < idx) add('warning','DUPLICATE_SEQ', k + ' 序号 ' + String(row.seq).trim() + ' 在第 ' + (dupIdx+1) + ' 行和第 ' + (idx+1) + ' 行重复' + ctx,'序号应唯一', k, idx); } }); }); BOM_KEYS.forEach(k => { if (typeof validateTableConsistency === 'function') { try { validateTableConsistency(k).forEach(x => add('warning','SUBTOTAL_INCONSISTENT', k + ' 汇总行 ' + (x.seq || x.idx) + ' 与子项合计不一致（预期重量 ' + x.expectedWeight + ' 实际 ' + x.actualWeight + '）','可点击"修复汇总"修复', k, x.idx)); } catch(e) {} } }); if (!state.scenarios || !Array.isArray(state.scenarios)) add('warning','SCENARIOS_INVALID','方案数据不是数组','系统会在下次保存方案时修复'); const errorCount = issues.filter(x=>x.level==='error').length; const warningCount = issues.filter(x=>x.level==='warning').length; return { passed: errorCount === 0, summary: { errorCount, warningCount, totalCount: issues.length }, issues, checkedAt: new Date().toISOString() }; }
+const TABLE_LABELS = { water:'水轮机材料', gen:'发电机材料', valve:'进水阀材料', valve_door:'阀门(门)材料', water_parts:'水轮机备件', gen_parts:'发电机备件', valve_parts:'进水阀备件', water_tools:'水轮机工具', gen_tools:'发电机工具', valve_tools:'进水阀工具', automation:'自动化', monitoring:'在线监测', liaison:'设联会' };
+function _navigateErrorByIdx(idx) { const issues = window.__healthIssues; if (issues && issues[idx]) _navigateToError(issues[idx]); }
+function _navigateToError(issue) {
+  if (!issue.tableKey || issue.rowIdx < 0) return;
+  const k = issue.tableKey;
+  if (['water','gen','valve','valve_door'].includes(k)) { state.currentMatTab = k; renderMaterials(); }
+  else if (['water_parts','gen_parts','valve_parts'].includes(k)) { state.currentPartsTab = k; renderParts(); }
+  else if (['water_tools','gen_tools','valve_tools'].includes(k)) { state.currentToolsTab = k; renderTools(); }
+  else if (['automation','monitoring','liaison'].includes(k)) { renderAll(); }
+  const overlay = document.getElementById('healthOverlay');
+  if (overlay) overlay.remove();
+  setTimeout(() => _highlightErrorRow(k, issue.rowIdx), 200);
+}
+function _highlightErrorRow(tableKey, rowIdx) {
+  let tableEl = null;
+  if (['water','gen','valve','valve_door'].includes(tableKey)) { tableEl = document.getElementById('matTable'); }
+  else if (['water_parts','gen_parts','valve_parts'].includes(tableKey)) { tableEl = document.getElementById('partsTable'); }
+  else if (['water_tools','gen_tools','valve_tools'].includes(tableKey)) { tableEl = document.getElementById('toolsTable'); }
+  else if (tableKey === 'automation') { tableEl = document.getElementById('automationTable'); }
+  else if (tableKey === 'monitoring') { tableEl = document.getElementById('monitoringTable'); }
+  else if (tableKey === 'liaison') { tableEl = document.getElementById('liaisonTable'); }
+  if (!tableEl) return;
+  const rows = tableEl.querySelectorAll('tbody tr');
+  let targetRow = rows[rowIdx];
+  if (!targetRow) { targetRow = tableEl.querySelector('tr[data-row="' + rowIdx + '"]'); }
+  if (targetRow) {
+    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    targetRow.style.transition = 'background 0.3s';
+    targetRow.style.background = 'var(--accent-light, #fff3cd)';
+    targetRow.style.boxShadow = '0 0 12px var(--accent, #f0a030)';
+    setTimeout(() => { targetRow.style.background = ''; targetRow.style.boxShadow = ''; }, 3000);
+  }
+}
+function showDataHealthReport(report) {
+  const r = report || generateDataHealthReport();
+  const existing = document.getElementById('healthOverlay');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'healthOverlay';
+  overlay.className = 'health-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  window.__healthIssues = r.issues;
+  const byTable = {};
+  r.issues.forEach((iss, idx) => { iss._idx = idx; const tk = iss.tableKey || '全局'; if (!byTable[tk]) byTable[tk] = []; byTable[tk].push(iss); });
+  let groupsHtml = '';
+  Object.keys(byTable).forEach(tk => {
+    const issues = byTable[tk]; const label = TABLE_LABELS[tk] || tk;
+    const errCount = issues.filter(x => x.level === 'error').length;
+    const warnCount = issues.filter(x => x.level === 'warning').length;
+    let badge = '';
+    if (errCount > 0) badge += '<span class="health-badge error">' + errCount + ' 错误</span>';
+    if (warnCount > 0) badge += '<span class="health-badge warning">' + warnCount + ' 警告</span>';
+    let rowsHtml = '';
+    issues.forEach(iss => {
+      const icon = iss.level === 'error' ? '❌' : '⚠️';
+      const cls = iss.level === 'error' ? 'health-row-error' : 'health-row-warning';
+      const clickable = iss.tableKey && iss.rowIdx >= 0 ? 'health-row-clickable' : '';
+      const rowInfo = iss.rowIdx >= 0 ? '第' + (iss.rowIdx + 1) + '行' : '';
+      rowsHtml += '<div class="health-issue-row ' + cls + ' ' + clickable + '"' +
+        (clickable ? ' onclick="_navigateErrorByIdx(' + iss._idx + ')"' : '') + '>' +
+        '<span class="health-issue-icon">' + icon + '</span>' +
+        '<span class="health-issue-msg">' + rowInfo + ' ' + escHtml(iss.message) + '</span>' +
+        (iss.suggestion ? '<span class="health-issue-tip">' + escHtml(iss.suggestion) + '</span>' : '') +
+        (clickable ? '<span class="health-issue-nav">定位 →</span>' : '') + '</div>';
+    });
+    groupsHtml += '<div class="health-group"><div class="health-group-header"><span class="health-group-title">' + escHtml(label) + '</span>' + badge + '</div>' +
+      '<div class="health-group-rows">' + rowsHtml + '</div></div>';
+  });
+  const passedIcon = r.passed ? '✅' : '⚠️';
+  const passedText = r.passed ? '数据体检通过' : '数据体检未通过';
+  const passedClass = r.passed ? 'health-pass' : 'health-fail';
+  overlay.innerHTML = '<div class="health-modal">' +
+    '<div class="health-header"><span class="health-title">🔍 快速查错</span>' +
+    '<button class="health-close" onclick="document.getElementById(\'healthOverlay\').remove()">✕</button></div>' +
+    '<div class="health-summary ' + passedClass + '"><span class="health-summary-icon">' + passedIcon + '</span>' +
+    '<span class="health-summary-text">' + passedText + '</span>' +
+    '<span class="health-summary-stats">错误 ' + r.summary.errorCount + ' · 警告 ' + r.summary.warningCount + ' · 共 ' + r.summary.totalCount + ' 项</span>' +
+    '<span class="health-summary-time">' + new Date(r.checkedAt).toLocaleString('zh-CN') + '</span></div>' +
+    '<div class="health-body">' + (r.issues.length === 0 ? '<div class="health-empty">🎉 未发现任何数据问题</div>' : groupsHtml) + '</div>' +
+    '<div class="health-footer"><span class="health-hint">💡 点击带有「定位 →」的条目可跳转到对应单元格</span>' +
+    '<button class="btn" onclick="document.getElementById(\'healthOverlay\').remove()">关闭</button>' +
+    (r.summary.errorCount + r.summary.warningCount > 0 ? '<button class="btn primary" onclick="fixAllConsistency(); document.getElementById(\'healthOverlay\').remove(); setTimeout(function(){ showDataHealthReport(); },500);">🔧 一键修复</button>' : '') +
+    '</div></div>';
+  document.body.appendChild(overlay);
+}
 
 function persistData() {
   try {
