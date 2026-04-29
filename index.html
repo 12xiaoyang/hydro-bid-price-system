@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>水电站投标价格分析系统 · Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!-- ============ 顶部导航 ============ -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">💧</div>
+    水电投标系统
+  </div>
+  <div class="tabs-nav" id="tabsNav">
+    <button data-page="overview" class="active">📊 概览</button>
+    <button data-page="machines">⚙️ 三大主机</button>
+    <button data-page="materials">📋 材料明细</button>
+    <button data-page="parts-tools">🔧 备件工具</button>
+    <button data-page="auto">🤖 自动化/监测</button>
+    <button data-page="transport">🚛 运输费</button>
+    <button data-page="liaison">🤝 设联会</button>
+    <button data-page="agency">💼 招标代理费</button>
+    <button data-page="bidanalysis">🎯 竞价分析</button>
+    <button data-page="scenarios">📈 方案对比</button>
+    <button data-page="matlib">🗄️ 材料库</button>
+    <button data-page="manual">📖 使用手册</button>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-toggle" id="themeToggle" title="切换暗色/亮色模式">🌙</button>
+    <button class="btn accent-btn" onclick="saveHTML()">💾 保存</button>
+    <button class="btn" onclick="document.getElementById('importFileInput').click()">📥 导入</button>
+    <button class="btn" onclick="exportProjectFile()">📦 导出项目</button>
+    <button class="btn" onclick="undoProjectSnapshot()">↩ 撤销</button>
+    <button class="btn" onclick="redoProjectSnapshot()">↪ 重做</button>
+    <button class="btn" onclick="showDataHealthReport()">🩺 体检</button>
+    <button class="btn" id="exportCsvBtn" onclick="exportCSV()">📤 导出CSV</button>
+    <button class="btn primary" id="printBtn" onclick="handlePrint()">🖨️ 打印PDF</button>
+    <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="importFullData(event)">
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ============ 左侧参数 ============ -->
+<aside class="sidebar">
+
+  <div class="section">
+    <div class="section-title">项目信息</div>
+    <div class="field-row">
+      <label class="field-label">项目名称</label>
+      <input type="text" id="projectName" value="广西那读电站">
+    </div>
+    <div class="field-row">
+      <label class="field-label">机组台数</label>
+      <input type="number" id="unitCount" value="4" min="1" max="20" step="1">
+    </div>
+    <div class="toggle-row">
+      <label>水轮机</label>
+      <div class="toggle-pills" id="waterToggle">
+        <button class="on" data-v="1">有</button>
+        <button data-v="0">无</button>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <label>发电机</label>
+      <div class="toggle-pills" id="genToggle">
+        <button class="on" data-v="1">有</button>
+        <button data-v="0">无</button>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <label>阀门</label>
+      <div class="toggle-pills" id="valveToggle">
+        <button class="on" data-v="1">有</button>
+        <button data-v="0">无</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="consistencyBanner" style="display:none;background:#fef7e8;border:1px solid #e6a23c;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#b05d1a;align-items:center;justify-content:space-between;gap:8px;">
+    <span id="consistencyBannerText">⚠ 检测到数据不一致</span>
+    <button onclick="fixAllConsistency()" style="padding:3px 10px;background:#e6a23c;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">一键修复所有不一致</button>
+  </div>
+  <div class="section">
+    <div class="section-title">三大主机参数</div>
+    <div class="field-row">
+      <label class="field-label">水机·重量 (T) <span class="field-hint-embedded">自动计算</span></label>
+      <input type="number" id="waterWeight" readonly step="0.1" placeholder="--">
+    </div>
+    <div class="field-row">
+      <label class="field-label field-hint">├ 材料价 <span class="field-hint-embedded">自动汇总</span></label>
+      <input type="number" id="waterMat" readonly step="0.01" placeholder="--">
+    </div>
+    <div class="field-row">
+      <label class="field-label field-hint">├ 外购件价 <span class="field-hint-embedded">自动汇总</span></label>
+      <input type="number" id="waterBuy" readonly step="0.01" placeholder="--">
+    </div>
+    <div class="field-row">
+      <label class="field-label field-hint">└ 外购件重 (T) <span class="field-hint-embedded">自动汇总</span></label>
+      <input type="number" id="waterBuyWeight" readonly step="0.01" placeholder="--">
+    </div>
+    <div class="field-row" style="margin-top:8px;">
+      <label class="field-label">发机·重量 (T) <span class="field-hint-embedded">自动计算</span></label>
+      <input type="number" id="genWeight" readonly step="0.1" placeholder="--">
+    </div>
+    <div class="field-row">
+      <label class="field-label field-hint">├ 材料价 <span class="field-hint-embedded">自动汇总</span></label>
+      <input type="number" id="genMat" readonly step="0.01" placeholder="--">
+    </div>
+    <div class="field-row">
+      <label class="field-label field-hint">├ 外购件价 <span class="field-hint-embedded">自动汇总</span></label>
+      <input type="number" id="genBuy" readonly step="0.01" placeholder="--">
+    </div>
+    <div class="field-row">
+      <label class="field-label field-hint">└ 外购件重 (T) <span class="field-hint-embedded">自动汇总</span></label>
+      <input type="number" id="genBuyWeight" readonly step="0.01" placeholder="--">
+    </div>
+    <div class="field-row" style="margin-top:8px;">
+      <label class="field-label">阀门·重量 (T)
+        <span class="field-hint-embedded">可手动填写 · <span id="valveWeightRef" style="color:var(--teal);">参考: —</span></span>
+      </label>
+      <input type="number" id="valveWeight" step="0.1" placeholder="手动输入">
+    </div>
+    <div class="field-row">
+      <label class="field-label field-hint">├ 外购价 (万元)
+        <span class="field-hint-embedded">可手动填写 · <span id="valveBuyRef" style="color:var(--teal);">参考: —</span></span>
+      </label>
+      <input type="number" id="valveBuy" step="0.01" placeholder="手动输入">
+    </div>
+    <div class="field-row">
+      <label class="field-label field-hint">└ 外购件重 (T)
+        <span class="field-hint-embedded">可手动填写 · <span id="valveBuyWeightRef" style="color:var(--teal);">参考: —</span></span>
+      </label>
+      <input type="number" id="valveBuyWeight" step="0.01" placeholder="手动输入">
+    </div>
+  </div>
+
+  <div class="section summary-section">
+    <div class="section-title">备件与工具汇总</div>
+    <div class="field-row">
+      <label class="field-label field-hint">├ 水机备件(万元)</label>
+      <input type="number" id="waterPartsAmt" readonly step="0.01" class="auto-computed" placeholder="--">
+    </div>
+    <div class="field-row">
+      <label class="field-label field-hint">├ 发机备件(万元)</label>
+      <input type="number" id="genPartsAmt" readonly step="0.01" class="auto-computed" placeholder="--">
+    </div>
+    <div class="field-row">
+      <label class="field-label field-hint">└ 阀门备件(万元)</label>
+      <input type="number" id="valvePartsAmt" readonly step="0.01" class="auto-computed" placeholder="--">
+    </div>
+    <div class="field-row">
+      <label class="field-label field-hint">├ 水机工具(万元)</label>
+      <input type="number" id="waterToolsAmt" readonly step="0.01" class="auto-computed" placeholder="--">
+    </div>
+    <div class="field-row">
+      <label class="field-label field-hint">├ 发机工具(万元)</label>
+      <input type="number" id="genToolsAmt" readonly step="0.01" class="auto-computed" placeholder="--">
+    </div>
+    <div class="field-row">
+      <label class="field-label field-hint">└ 阀门工具(万元)</label>
+      <input type="number" id="valveToolsAmt" readonly step="0.01" class="auto-computed" placeholder="--">
+    </div>
+    <hr class="summary-divider">
+    <div class="field-row summary-highlight">
+      <label class="field-label">备件+工具总金额(万元)</label>
+      <input type="number" id="partsToolsTotalAmt" readonly step="0.01" class="auto-computed" placeholder="--">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">加价系数</div>
+    <div class="slider-group">
+      <div class="slider-label">
+        <span>自制加价</span>
+        <span><input type="number" id="selfMarkupDisp" value="100" min="0" max="200" step="1" class="slider-disp-input">%</span>
+      </div>
+      <input type="range" id="selfMarkup" value="100" min="0" max="200" step="1">
+    </div>
+    <div class="slider-group">
+      <div class="slider-label">
+        <span>外购加价</span>
+        <span><input type="number" id="buyMarkupDisp" value="10" min="0" max="50" step="1" class="slider-disp-input">%</span>
+      </div>
+      <input type="range" id="buyMarkup" value="10" min="0" max="50" step="1">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">运输</div>
+    <div class="slider-group">
+      <div class="slider-label">
+        <span>运输距离</span>
+        <span><input type="number" id="distanceDisp" value="3700" min="100" max="8000" step="50" class="slider-disp-input"> km</span>
+      </div>
+      <input type="range" id="distance" value="3700" min="100" max="8000" step="50">
+    </div>
+    <div class="field-row">
+      <label class="field-label">普通件运费单价
+        <span class="field-hint-embedded">元／吨·公里（非超宽件）</span>
+      </label>
+      <input type="number" id="tonKmPrice" value="0.9" step="0.05">
+    </div>
+    <div class="field-row">
+      <label class="field-label">超宽件运费单价
+        <span class="field-hint-embedded">元／吨·公里（需特殊车辆）</span>
+      </label>
+      <input type="number" id="tonKmPriceWide" value="0" step="0.05">
+    </div>
+    <div class="field-row">
+      <label class="field-label">超宽件重量 (T)
+        <span class="field-hint-embedded">需特殊运输的设备重量</span>
+      </label>
+      <input type="number" id="wideWeight" value="0" step="0.1">
+    </div>
+    <div class="field-row">
+      <label class="field-label">运输重量附加系数
+        <span class="field-hint-embedded">含包装箱等，通常取 1.05</span>
+      </label>
+      <input type="number" id="transportExtra" value="1.05" step="0.01">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">附加费用 (万元)</div>
+    <div class="field-row">
+      <label class="field-label">备件汇总 <span class="field-hint-embedded">只读·自动计算</span></label>
+      <input type="number" id="partsAmt" readonly step="0.01" class="auto-computed" placeholder="--">
+    </div>
+    <div class="field-row">
+      <label class="field-label">工具汇总 <span class="field-hint-embedded">只读·自动计算</span></label>
+      <input type="number" id="toolsAmt" readonly step="0.01" class="auto-computed" placeholder="--">
+    </div>
+    <div class="field-row">
+      <label class="field-label">主机自动化</label>
+      <input type="number" id="autoAmt" value="0" step="0.01">
+    </div>
+    <div class="field-row">
+      <label class="field-label">在线监测</label>
+      <input type="number" id="monitorAmt" value="0" step="0.01">
+    </div>
+    <div class="field-row">
+      <label class="field-label">设计联络会</label>
+      <input type="number" id="liaisonAmt" value="0" step="0.01">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">操作</div>
+    <button class="btn primary" style="width:100%;margin-bottom:6px;" onclick="saveScenario()">保存当前方案</button>
+    <button class="btn" style="width:100%;" onclick="resetDefaults()">重置默认值</button>
+  </div>
+
+</aside>
+
+<!-- ============ 内容区 ============ -->
+<main class="content">
+
+  <!-- ===== 概览 Tab ===== -->
+  <div class="page active" id="page-overview">
+    <div class="hero">
+      <div class="hero-main">
+        <div class="hero-label">💰 拟投标总价</div>
+        <div class="hero-value" id="kTotal">—<span class="unit">万元</span></div>
+        <div class="hero-sub" id="kTotalSub">含机组 · 主机/备件/工具/运输/服务</div>
+      </div>
+      <div class="mini-kpi">
+        <div class="hero-label">单台报价</div>
+        <div class="hero-value" id="kUnit">—</div>
+        <div class="hero-sub">万元 / 台</div>
+      </div>
+      <div class="mini-kpi">
+        <div class="hero-label">固定成本</div>
+        <div class="hero-value" id="kFixed">—</div>
+        <div class="hero-sub">材料+外购合计</div>
+      </div>
+      <div class="mini-kpi" id="kAbsorbKpi">
+        <div class="hero-label">消化占比</div>
+        <div class="hero-value" id="kAbsorb">—<span class="unit">%</span></div>
+        <div class="hero-sub" id="kAbsorbSub">消化 — 万</div>
+      </div>
+      <div class="mini-kpi">
+        <div class="hero-label">代理服务费</div>
+        <div class="hero-value" id="kAgency">—</div>
+        <div class="hero-sub">万元（预估）</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">报价构成 <span style="font-size:11px;color:var(--text-dim);font-weight:400;">占比分析</span></div>
+        <div class="card-subtitle">Bid Composition · 万元</div>
+        <div class="chart-box"><canvas id="chComposition"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">吨价对比 <span style="font-size:11px;color:var(--text-dim);font-weight:400;">材料价 vs 投标价</span></div>
+        <div class="card-subtitle">Unit Price Analysis · 万元/T</div>
+        <div class="chart-box"><canvas id="chTonPrice"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        报价明细清单
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span id="marginBadge" style="display:none;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;"></span>
+          <button class="btn" style="font-size:11px;padding:3px 10px;" onclick="document.querySelector('[data-page=scenarios]').click()">对比方案 →</button>
+        </div>
+      </div>
+      <div class="card-subtitle">Itemized Bid Schedule · 万元</div>
+      <table>
+        <thead>
+          <tr>
+            <th>项目</th>
+            <th class="num">自制成本</th>
+            <th class="num">外购成本</th>
+            <th class="num">自制加价</th>
+            <th class="num">外购加价</th>
+            <th class="num">单台成本</th>
+            <th class="num">数量</th>
+            <th class="num">单价</th>
+            <th class="num">总价(万)</th>
+            <th style="width:130px;">占比</th>
+          </tr>
+        </thead>
+        <tbody id="billBody"></tbody>
+        <tfoot>
+          <tr class="total">
+            <td>合计</td>
+            <td class="num" id="tSelf">—</td>
+            <td class="num" id="tBuy">—</td>
+            <td class="num" id="tSelfM">—</td>
+            <td class="num" id="tBuyM">—</td>
+            <td class="num" id="tCost">—</td>
+            <td class="num">—</td>
+            <td class="num">—</td>
+            <td class="num" id="tTotal">—</td>
+            <td>100%</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== 三大主机 Tab ===== -->
+  <div class="page" id="page-machines">
+    <div class="card">
+      <div class="card-title">三大主机价格分析</div>
+      <div class="card-subtitle">重量·材料·吨价·成本拆解</div>
+      <div class="grid-3" id="machinesGrid"></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">材料 vs 投标 吨价</div>
+        <div class="chart-box"><canvas id="chTonPrice2"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">自制 vs 外购 占比</div>
+        <div class="chart-box"><canvas id="chSelfBuy"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">单台成本堆叠</div>
+      <div class="card-subtitle">Cost Stack · 万元</div>
+      <div class="chart-box tall"><canvas id="chCostStack"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ===== 材料明细 Tab ===== -->
+  <div class="page" id="page-materials">
+    <div class="card">
+      <div class="card-title">
+        材料明细
+        <div class="toggle-pills" id="matTabs" style="font-size:12px;">
+          <button class="on" data-mat="water">水轮机 (66)</button>
+          <button data-mat="gen">发电机 (72)</button>
+          <button data-mat="valve">进水阀(参考) (49)</button>
+          <button data-mat="valve_door">阀门整机 (45)</button>
+        </div>
+      </div>
+      <div class="card-subtitle">来自原表「水/发/阀/阀门」sheet · 共 232 条</div>
+      <div class="search-bar">
+        <input type="text" id="matSearch" placeholder="搜索部件名称、材料、规格...">
+        <select id="matFilter">
+          <option value="all">全部</option>
+          <option value="self">仅自制</option>
+          <option value="buy">仅外购</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table id="matTable"></table>
+      </div>
+      <div id="matSummary" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);"></div>
+    </div>
+  </div>
+
+  <!-- ===== 备件工具 Tab ===== -->
+  <div class="page" id="page-parts-tools">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">备件清单</div>
+        <div class="card-subtitle">Spare Parts · 万元</div>
+        <div class="toggle-pills" id="partsTabs" style="margin-bottom:12px;">
+          <button class="on" data-key="water_parts">水机 (15)</button>
+          <button data-key="gen_parts">发机 (15)</button>
+          <button data-key="valve_parts">阀门 (14)</button>
+        </div>
+        <div class="table-wrap">
+          <table id="partsTable"></table>
+        </div>
+        <div id="partsSummary" style="margin-top:10px;font-size:12px;color:var(--text-muted);"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">工具清单</div>
+        <div class="card-subtitle">Tools · 万元</div>
+        <div class="toggle-pills" id="toolsTabs" style="margin-bottom:12px;">
+          <button class="on" data-key="water_tools">水机 (19)</button>
+          <button data-key="gen_tools">发机 (14)</button>
+          <button data-key="valve_tools">阀门 (7)</button>
+        </div>
+        <div class="table-wrap">
+          <table id="toolsTable"></table>
+        </div>
+        <div id="toolsSummary" style="margin-top:10px;font-size:12px;color:var(--text-muted);"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 自动化/监测 Tab ===== -->
+  <div class="page" id="page-auto">
+    <div class="card">
+      <div class="card-title">自动化检测分类清单 <span style="font-size:11px;color:var(--text-dim);font-weight:400;">按项目表格层级重构</span></div>
+      <div class="card-subtitle">水轮机 / 发电机 / 阀门 / 备件 / 工具 / 辅助设备 · 树形序号</div>
+      <div class="search-bar">
+        <input type="text" id="autoSearch" placeholder="搜索元件、型号、制造厂...">
+      </div>
+      <div class="table-wrap">
+        <table id="autoTable"></table>
+      </div>
+      <div id="autoSummary" style="margin-top:10px;font-size:12px;color:var(--text-muted);"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">在线监测清单 <span style="font-size:11px;color:var(--text-dim);font-weight:400;">23 项</span></div>
+      <div class="card-subtitle">成都威尔森 / 华科同安等</div>
+      <div class="table-wrap">
+        <table id="monitorTable"></table>
+      </div>
+      <div id="monitorSummary" style="margin-top:10px;font-size:12px;color:var(--text-muted);"></div>
+    </div>
+  </div>
+
+  <!-- ===== 运输费 Tab ===== -->
+  <div class="page" id="page-transport">
+    <div class="card">
+      <div class="card-title">运输费计算器</div>
+      <div class="card-subtitle">Transport Cost Calculator</div>
+
+      <div class="grid-2">
+        <div>
+          <h4 style="font-size:13px;margin-bottom:10px;font-weight:600;">输入参数</h4>
+          <table style="font-size:13px;">
+            <tr>
+              <td style="color:var(--text-muted);">主机总重量（单台，T）</td>
+              <td class="num" id="tWeightTotal">—</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted);">运输重量附加系数
+                <span style="font-size:11px;color:var(--text-dim);display:block;">含包装箱等附加重量</span>
+              </td>
+              <td class="num" id="tFactor">1.05</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted);">附加后实际运输重量（T）</td>
+              <td class="num" id="tWeightAdj">—</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted);">其中：超宽件重量（T）
+                <span style="font-size:11px;color:var(--text-dim);display:block;">需特殊运输车辆的设备</span>
+              </td>
+              <td class="num" id="tWeightWide">—</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted);">其中：普通件重量（T）</td>
+              <td class="num" id="tWeightNorm">—</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted);">运输距离（km）</td>
+              <td class="num" id="tDistance">—</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted);">超宽件运费单价（元/吨·km）</td>
+              <td class="num" id="tPriceWide">—</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted);">普通件运费单价（元/吨·km）</td>
+              <td class="num" id="tPriceNorm">—</td>
+            </tr>
+          </table>
+        </div>
+        <div>
+          <h4 style="font-size:13px;margin-bottom:10px;font-weight:600;">计算结果</h4>
+          <table style="font-size:13px;">
+            <tr>
+              <td style="color:var(--text-muted);">超宽件运费小计（万元）</td>
+              <td class="num" id="tCostWide">—</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted);">普通件运费小计（万元）</td>
+              <td class="num" id="tCostNorm">—</td>
+            </tr>
+            <tr class="total">
+              <td>单台运输费合计</td>
+              <td class="num" id="tCostUnit">—</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-muted);">机组数量（台）</td>
+              <td class="num" id="tQty">—</td>
+            </tr>
+            <tr class="total">
+              <td>全部机组运输费总计（万元）</td>
+              <td class="num" id="tCostAll">—</td>
+            </tr>
+          </table>
+          <div style="margin-top:14px;padding:10px;background:var(--blue-light);border-radius:4px;font-size:11.5px;color:var(--blue);line-height:1.6;">
+            <strong>说明：</strong><br>
+            运费结果会随重量、附加系数、单价和距离自动刷新。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 设联会 Tab ===== -->
+  <div class="page" id="page-liaison">
+    <div class="card">
+      <div class="card-title">设计联络会、技术培训、工厂试验、技术服务费用</div>
+      <div class="card-subtitle">Design Liaison & Service · 16 项</div>
+      <div class="table-wrap">
+        <table id="liaisonTable"></table>
+      </div>
+      <div id="liaisonSummary" style="margin-top:10px;font-size:12px;color:var(--text-muted);"></div>
+    </div>
+  </div>
+
+  <!-- ===== 招标代理费 Tab ===== -->
+  <div class="page" id="page-agency">
+    <div class="card">
+      <div class="card-title">招标代理服务费</div>
+      <div class="card-subtitle">国家计委 计价格[2002]1980号文 · 阶梯累计</div>
+      <div id="agencyInfo" class="alert alert-info"></div>
+      <table class="tier-table" id="agencyTable">
+        <thead>
+          <tr>
+            <th>序号</th>
+            <th>区间</th>
+            <th class="num">区间长度(万)</th>
+            <th class="num">费率</th>
+            <th class="num">本档应收(万)</th>
+            <th class="num">累计(万)</th>
+          </tr>
+        </thead>
+        <tbody id="agencyTableBody"></tbody>
+      </table>
+      <div style="margin-top:14px;padding:10px;background:var(--blue-light);border-radius:4px;font-size:11.5px;color:var(--blue);line-height:1.6;">
+        <strong>说明：</strong>招标代理费按累进制计算，投标价超过的每一档按对应费率收取。<br>
+        例如：投标价 1990 万 → 0-100万收 1.5%、100-500万收 1.1%、500-1000万收 0.8%、1000-1990万收 0.5%
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 材料库 Tab ===== -->
+  <div class="page" id="page-matlib">
+    <div class="card">
+      <div class="card-title">材料标准价格数据库</div>
+      <div class="card-subtitle">Material Price Library · 仅维护材料标准价格</div>
+      <div class="table-toolbar">
+        <div>
+          <button class="btn primary" onclick="importMaterials()" style="margin-right:6px;">一键导入材料</button>
+          <button class="btn" onclick="exportMatLib()">导出 Excel</button>
+          <button class="btn" onclick="addMatLibRow()">新增材料</button>
+          <button class="btn btn-fix" onclick="batchUpdatePrices()">批量更新价格</button>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="matLibSearch" placeholder="搜索材料名称、规格..." style="width:180px;text-align:left;">
+          <select id="matLibCatFilter" style="width:130px;">
+            <option value="all">全部分类</option>
+            <option>板材类</option><option>型材类</option><option>铸件类</option><option>锻件类</option>
+            <option>绝缘材料</option><option>铜材</option><option>不锈钢材</option><option>管材</option>
+            <option>成品件</option><option>轴承/轴套</option><option>密封件</option><option>阀门类</option>
+            <option>其他</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap" style="max-height:500px;">
+        <table id="matLibTable"></table>
+      </div>
+      <div id="matLibSummary" style="margin-top:10px;font-size:12px;color:var(--text-muted);"></div>
+    </div>
+    <!-- 导入预览区域 -->
+    <div class="card" id="importPreviewCard" style="display:none;">
+      <div class="card-title">导入预览</div>
+      <div class="card-subtitle" id="importPreviewSub"></div>
+      <div class="table-wrap" style="max-height:400px;">
+        <table id="importPreviewTable"></table>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+        <span style="font-size:12px;color:var(--text-muted);" id="importConflictInfo"></span>
+        <div style="flex:1;"></div>
+        <button class="btn" onclick="cancelImport()">取消</button>
+        <button class="btn primary" onclick="confirmImport()">确认导入</button>
+      </div>
+    </div>
+    <!-- 导入日志 -->
+    <div class="card">
+      <div class="card-title">导入日志</div>
+      <div class="card-subtitle" id="importLogInfo">暂无导入记录</div>
+      <div class="table-wrap" style="max-height:200px;">
+        <table id="importLogTable">
+          <thead><tr><th>时间</th><th>文件名</th><th>成功</th><th>失败</th><th>备注</th></tr></thead>
+          <tbody id="importLogBody"><tr><td colspan="5" style="text-align:center;color:var(--text-dim);">—</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 方案对比 Tab ===== -->
+  <div class="page" id="page-scenarios">
+    <div class="card">
+      <div class="card-title">方案保存与对比 <span style="font-size:11px;color:var(--text-dim);font-weight:400;">最多 8 个</span></div>
+      <div class="card-subtitle" id="scenarioHint">暂无保存的方案。调整左侧参数后点击"保存当前方案"。</div>
+      <div class="scenario-list" id="scenarioList"></div>
+    </div>
+    <div class="card" id="scenarioCompareCard" style="display:none;">
+      <div class="card-title">方案横向对比</div>
+      <div class="card-subtitle">Side-by-Side Comparison</div>
+      <table id="scenarioCompareTable"></table>
+    </div>
+  </div>
+
+  <!-- ===== 竞价分析 Tab ===== -->
+  <div class="page" id="page-bidanalysis">
+    <div class="bid-analysis-grid">
+      <div class="bid-kpi">
+        <div class="bid-kpi-label">🎯 预估胜率</div>
+        <div class="bid-kpi-value" id="baWinRate" style="color:var(--green);">—</div>
+        <div class="bid-kpi-sub">基于当前报价水平</div>
+      </div>
+      <div class="bid-kpi">
+        <div class="bid-kpi-label">📉 最低可报价</div>
+        <div class="bid-kpi-value" id="baFloor" style="color:var(--red);">—</div>
+        <div class="bid-kpi-sub">万元（保本线）</div>
+      </div>
+      <div class="bid-kpi">
+        <div class="bid-kpi-label">📈 建议报价区间</div>
+        <div class="bid-kpi-value" id="baSuggest" style="color:var(--blue);font-size:16px;">—</div>
+        <div class="bid-kpi-sub">万元（含合理利润）</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">🏆 胜率预测仪表盘</div>
+        <div class="card-subtitle">基于报价 vs 成本比例的经验模型</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:40px;padding:20px 0;">
+          <div class="gauge-wrap" id="baGaugeWrap">
+            <svg class="gauge-svg" viewBox="0 0 140 80">
+              <defs>
+                <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" style="stop-color:var(--red)"/>
+                  <stop offset="50%" style="stop-color:var(--amber)"/>
+                  <stop offset="100%" style="stop-color:var(--green)"/>
+                </linearGradient>
+              </defs>
+              <path d="M 10 70 A 60 60 0 0 1 130 70" fill="none" stroke="var(--border)" stroke-width="12" stroke-linecap="round"/>
+              <path id="gaugeArc" d="M 10 70 A 60 60 0 0 1 130 70" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 188"/>
+              <text id="gaugeText" x="70" y="65" text-anchor="middle" font-size="18" font-weight="700" fill="var(--text)" font-family="SF Mono, monospace">—</text>
+              <text x="70" y="78" text-anchor="middle" font-size="9" fill="var(--text-dim)">胜率</text>
+              <text x="12" y="82" font-size="8" fill="var(--red)" text-anchor="middle">低</text>
+              <text x="128" y="82" font-size="8" fill="var(--green)" text-anchor="middle">高</text>
+            </svg>
+          </div>
+          <div style="flex:1;">
+            <div id="baWinComment" style="font-size:13px;color:var(--text-muted);line-height:1.7;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📊 利润率敏感度分析</div>
+        <div class="card-subtitle">报价变动对利润的影响</div>
+        <div id="baSensitivity" style="padding:8px 0;"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">💡 报价策略建议</div>
+      <div class="card-subtitle">Bidding Strategy · 基于当前成本结构</div>
+      <div id="baStrategy" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:8px 0;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📉 价格阶梯模拟</div>
+      <div class="card-subtitle">不同报价下的利润与胜率变化</div>
+      <div class="chart-box"><canvas id="chBidLadder"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ===== 使用手册 Tab ===== -->
+  <div class="page" id="page-manual">
+
+    <!-- Hero Banner -->
+    <div style="background:linear-gradient(135deg,var(--blue) 0%,var(--indigo) 60%,var(--purple) 100%);border-radius:14px;padding:28px 32px;margin-bottom:20px;color:#fff;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:rgba(255,255,255,0.06);border-radius:50%;"></div>
+      <div style="position:absolute;bottom:-30px;left:60px;width:100px;height:100px;background:rgba(255,255,255,0.04);border-radius:50%;"></div>
+      <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;opacity:.75;margin-bottom:8px;font-weight:700;">📖 USER MANUAL</div>
+      <div style="font-size:26px;font-weight:700;margin-bottom:8px;line-height:1.2;">水电站投标价格分析系统</div>
+      <div style="font-size:13px;opacity:.85;line-height:1.7;">本系统用于水电站设备（水轮机、发电机、阀门）的投标报价测算与分析。<br>通过录入材料成本、加价系数、运输参数，自动计算最终投标总价并提供竞价策略建议。</div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+        <span style="background:rgba(255,255,255,0.18);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:600;">📊 11 个功能模块</span>
+        <span style="background:rgba(255,255,255,0.18);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:600;">✏️ 全表格可编辑</span>
+        <span style="background:rgba(255,255,255,0.18);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:600;">💾 本地数据持久化</span>
+        <span style="background:rgba(255,255,255,0.18);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:600;">🧮 自动计算支持</span>
+      </div>
+    </div>
+
+    <!-- Quick Navigation -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">快速导航</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:4px 0;">
+        <a href="#manual-workflow" style="text-decoration:none;background:var(--blue-light);border:1px solid var(--blue);border-radius:8px;padding:12px;text-align:center;color:var(--blue);font-size:12.5px;font-weight:600;transition:all .15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">① 基本工作流程</a>
+        <a href="#manual-sidebar" style="text-decoration:none;background:var(--green-light);border:1px solid var(--green);border-radius:8px;padding:12px;text-align:center;color:var(--green);font-size:12.5px;font-weight:600;transition:all .15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">② 左侧参数面板</a>
+        <a href="#manual-tables" style="text-decoration:none;background:var(--accent-light);border:1px solid var(--accent);border-radius:8px;padding:12px;text-align:center;color:var(--accent-dark);font-size:12.5px;font-weight:600;transition:all .15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">③ 数据表格编辑</a>
+        <a href="#manual-formula" style="text-decoration:none;background:var(--purple-light);border:1px solid var(--purple);border-radius:8px;padding:12px;text-align:center;color:var(--purple);font-size:12.5px;font-weight:600;transition:all .15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">④ 自动计算</a>
+        <a href="#manual-modules" style="text-decoration:none;background:var(--panel-alt);border:1px solid var(--border-strong);border-radius:8px;padding:12px;text-align:center;color:var(--text);font-size:12.5px;font-weight:600;transition:all .15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">⑤ 各模块详解</a>
+        <a href="#manual-save" style="text-decoration:none;background:var(--panel-alt);border:1px solid var(--border-strong);border-radius:8px;padding:12px;text-align:center;color:var(--text);font-size:12.5px;font-weight:600;transition:all .15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">⑥ 保存与导出</a>
+        <a href="#manual-scenarios" style="text-decoration:none;background:var(--panel-alt);border:1px solid var(--border-strong);border-radius:8px;padding:12px;text-align:center;color:var(--text);font-size:12.5px;font-weight:600;transition:all .15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">⑦ 方案对比</a>
+        <a href="#manual-faq" style="text-decoration:none;background:var(--panel-alt);border:1px solid var(--border-strong);border-radius:8px;padding:12px;text-align:center;color:var(--text);font-size:12.5px;font-weight:600;transition:all .15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">⑧ 常见问题</a>
+      </div>
+    </div>
+
+    <!-- Section 1: Workflow -->
+    <div class="card" id="manual-workflow">
+      <div class="card-title">① 基本工作流程</div>
+      <div class="card-subtitle">推荐的操作步骤，从录入到输出报价</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:16px 0;">
+        <div style="text-align:center;position:relative;">
+          <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--blue),var(--indigo));border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;color:#fff;font-size:20px;box-shadow:0 3px 10px var(--blue-glow);">1</div>
+          <div style="position:absolute;top:24px;left:calc(50% + 24px);right:0;height:2px;background:var(--border);"></div>
+          <div style="font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:4px;">选择设备类型</div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">左侧面板中<br>勾选有/无水轮机<br>发电机、阀门</div>
+        </div>
+        <div style="text-align:center;position:relative;">
+          <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--teal),var(--green));border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;color:#fff;font-size:20px;box-shadow:0 3px 10px rgba(0,191,165,.3);">2</div>
+          <div style="position:absolute;top:24px;left:calc(50% + 24px);right:0;height:2px;background:var(--border);"></div>
+          <div style="font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:4px;">录入材料明细</div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">在「材料明细」Tab<br>逐行填写重量<br>材料类别和金额</div>
+        </div>
+        <div style="text-align:center;position:relative;">
+          <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;color:#fff;font-size:20px;box-shadow:0 3px 10px var(--accent-glow);">3</div>
+          <div style="position:absolute;top:24px;left:calc(50% + 24px);right:0;height:2px;background:var(--border);"></div>
+          <div style="font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:4px;">调整加价系数</div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">左侧滑块调整<br>自制/外购加价率<br>运输参数</div>
+        </div>
+        <div style="text-align:center;position:relative;">
+          <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--purple),var(--indigo));border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;color:#fff;font-size:20px;box-shadow:0 3px 10px rgba(124,111,221,.3);">4</div>
+          <div style="position:absolute;top:24px;left:calc(50% + 24px);right:0;height:2px;background:var(--border);"></div>
+          <div style="font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:4px;">查看竞价分析</div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">「竞价分析」Tab<br>查看胜率预测<br>和报价建议</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--red),#c03050);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;color:#fff;font-size:20px;box-shadow:0 3px 10px rgba(224,64,96,.3);">5</div>
+          <div style="font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:4px;">保存/导出</div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">点击「💾 保存」<br>下载含数据的<br>HTML文件</div>
+        </div>
+      </div>
+      <div style="background:var(--blue-light);border-left:3px solid var(--blue);border-radius:0 6px 6px 0;padding:10px 14px;font-size:12px;color:var(--text);margin-top:8px;">
+        💡 <strong>提示：</strong>系统会<strong>实时自动计算</strong>，每次修改参数或数据后，概览页面的总价会立即更新。无需手动触发计算。
+      </div>
+    </div>
+
+    <!-- Section 2: Sidebar -->
+    <div class="card" id="manual-sidebar">
+      <div class="card-title">② 左侧参数面板详解</div>
+      <div class="card-subtitle">控制整个系统核心计算逻辑的参数区</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
+
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px;"><span style="background:var(--blue);color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;">项目信息</span></div>
+          <table style="font-size:12.5px;width:100%;">
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:7px 0;color:var(--text-muted);width:100px;">项目名称</td>
+              <td style="padding:7px 0;">用于保存文件时的命名，显示在标题栏</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:7px 0;color:var(--text-muted);">机组台数</td>
+              <td style="padding:7px 0;">影响单台报价计算，总价 = 单台价 × 台数</td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--text-muted);">有/无开关</td>
+              <td style="padding:7px 0;">控制水轮机/发电机/阀门是否计入报价</td>
+            </tr>
+          </table>
+
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin:14px 0 10px;display:flex;align-items:center;gap:6px;"><span style="background:var(--accent);color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;">加价系数</span></div>
+          <table style="font-size:12.5px;width:100%;">
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:7px 0;color:var(--text-muted);width:100px;">自制加价 %</td>
+              <td style="padding:7px 0;">自制件成本 × (1 + 自制加价率) = 报价<br><span style="color:var(--text-dim);font-size:11px;">默认 100%，即成本翻倍</span></td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--text-muted);">外购加价 %</td>
+              <td style="padding:7px 0;">外购件成本 × (1 + 外购加价率) = 报价<br><span style="color:var(--text-dim);font-size:11px;">默认 10%，外购件利润较低</span></td>
+            </tr>
+          </table>
+        </div>
+
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px;"><span style="background:var(--teal);color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;">运输参数</span></div>
+          <table style="font-size:12.5px;width:100%;">
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:7px 0;color:var(--text-muted);width:110px;">运输距离 km</td>
+              <td style="padding:7px 0;">工厂到项目现场的公路距离</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:7px 0;color:var(--text-muted);">普通件单价</td>
+              <td style="padding:7px 0;">元/吨·公里，适用于常规设备</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:7px 0;color:var(--text-muted);">超宽件单价</td>
+              <td style="padding:7px 0;">需要特殊车辆运输的大型设备单价</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:7px 0;color:var(--text-muted);">超宽件重量</td>
+              <td style="padding:7px 0;">填 0 则全部按普通件计算运费</td>
+            </tr>
+            <tr>
+              <td style="padding:7px 0;color:var(--text-muted);">重量附加系数</td>
+              <td style="padding:7px 0;">含包装箱附加，通常取 1.05</td>
+            </tr>
+          </table>
+
+          <div style="background:var(--green-light);border-left:3px solid var(--green);border-radius:0 6px 6px 0;padding:9px 12px;font-size:11.5px;color:var(--text);margin-top:12px;">
+            🔄 <strong>绿色字段</strong>为自动汇总值（从材料明细表计算），<strong>双击可手动覆盖</strong>，再次双击恢复自动值
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Table Editing -->
+    <div class="card" id="manual-tables">
+      <div class="card-title">③ 数据表格编辑操作</div>
+      <div class="card-subtitle">所有数据表格均支持双击/编辑按钮弹窗编辑，并保留单击快捷编辑</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text);">基础操作</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:8px;background:var(--panel-alt);border-radius:6px;">
+              <span style="background:var(--blue);color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;">单击</span>
+              <span style="font-size:12px;color:var(--text);">保留快捷 Inline 编辑，适合短字段快速修改</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:8px;background:var(--panel-alt);border-radius:6px;">
+              <span style="background:var(--teal);color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;">Enter</span>
+              <span style="font-size:12px;color:var(--text);">确认当前单元格，保存并完成编辑</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:8px;background:var(--panel-alt);border-radius:6px;">
+              <span style="background:var(--teal);color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;">Tab</span>
+              <span style="font-size:12px;color:var(--text);">确认并跳到同列下一行，快速批量录入</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:8px;background:var(--panel-alt);border-radius:6px;">
+              <span style="background:var(--red);color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;">Esc</span>
+              <span style="font-size:12px;color:var(--text);">取消编辑，恢复原值</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:8px;background:var(--panel-alt);border-radius:6px;">
+              <span style="background:var(--amber);color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;white-space:nowrap;flex-shrink:0;">双击</span>
+              <span style="font-size:12px;color:var(--text);">双击普通表格单元格/行可打开二级弹窗，完整编辑整行字段</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text);">行操作按钮</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:8px;background:var(--panel-alt);border-radius:6px;">
+              <span style="background:var(--blue);color:#fff;border-radius:4px;padding:2px 7px;font-size:13px;font-weight:700;flex-shrink:0;">✎</span>
+              <span style="font-size:12px;color:var(--text);">打开二级弹窗编辑整行，长备注/规格字段支持多行输入和完整查看</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:8px;background:var(--panel-alt);border-radius:6px;">
+              <span style="background:var(--red);color:#fff;border-radius:4px;padding:2px 7px;font-size:13px;font-weight:700;flex-shrink:0;">×</span>
+              <span style="font-size:12px;color:var(--text);">删除该行（有确认弹窗，操作不可撤销）</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:8px;background:var(--panel-alt);border-radius:6px;">
+              <span style="background:var(--green);color:#fff;border-radius:4px;padding:2px 7px;font-size:13px;font-weight:700;flex-shrink:0;">+</span>
+              <span style="font-size:12px;color:var(--text);">在该行后面插入一个同级空行</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:8px;background:var(--panel-alt);border-radius:6px;">
+              <span style="background:var(--purple);color:#fff;border-radius:4px;padding:2px 7px;font-size:12px;font-weight:700;flex-shrink:0;">↳</span>
+              <span style="font-size:12px;color:var(--text);">（材料明细专用）在该行下方插入一个子级行</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:8px;background:var(--panel-alt);border-radius:6px;">
+              <span style="font-size:20px;flex-shrink:0;">⬇️</span>
+              <span style="font-size:12px;color:var(--text);">表格底部「+ 添加新行」按钮，在末尾新增空行</span>
+            </div>
+          </div>
+          <div style="background:var(--amber-light);border-left:3px solid var(--amber);border-radius:0 6px 6px 0;padding:9px 12px;font-size:11.5px;color:var(--text);margin-top:12px;">
+            ⚠️ <strong>材料明细</strong>中灰色/蓝色的<strong>汇总行</strong>（序号如"一"、"1"、"2"）的重量和金额是自动汇总值，不可直接编辑，由子行数据自动累加。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: Advanced Calculation -->
+    <div class="card" id="manual-formula">
+      <div class="card-title">④ 自动计算与数据刷新</div>
+      <div class="card-subtitle">系统按内置计算规则实时刷新金额、合计、吨价等结果</div>
+      <div style="background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin:12px 0;font-size:12.5px;line-height:1.8;color:var(--text);">
+        修改表格字段后，相关金额、成本、汇总、筛选和导出结果会自动同步刷新。长文本和多字段修改建议使用二级弹窗编辑模式完成。
+      </div>
+    </div>
+
+    <!-- Section 5: Modules -->
+    <div class="card" id="manual-modules">
+      <div class="card-title">⑤ 各功能模块详解</div>
+      <div class="card-subtitle">顶部导航栏各 Tab 页面的用途说明</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;" open>
+          <summary style="padding:12px 16px;background:var(--panel-alt);cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;list-style:none;">
+            <span>📊</span> 概览 — 投标总价汇总与分析
+          </summary>
+          <div style="padding:14px 16px;font-size:12.5px;line-height:1.8;color:var(--text);">
+            <strong>顶部 5 个 KPI 卡片：</strong>拟投标总价、单台报价、固定成本、消化占比、代理服务费<br>
+            <strong>报价构成饼图：</strong>各分项占总价的比例，直观看出成本结构<br>
+            <strong>吨价对比图：</strong>材料吨价 vs 投标吨价，判断报价是否合理<br>
+            <strong>报价明细清单：</strong>逐行展示各设备的自制/外购成本、加价后报价及占比进度条<br>
+            <span style="color:var(--amber);">⚠ 消化占比 &gt; 45% 时，系统会显示红色预警提示</span>
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:12px 16px;background:var(--panel-alt);cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;list-style:none;">
+            <span>⚙️</span> 三大主机 — 水轮机/发电机/阀门成本卡片
+          </summary>
+          <div style="padding:14px 16px;font-size:12.5px;line-height:1.8;color:var(--text);">
+            每台设备显示：重量、材料价、外购件价、自制部分、材料吨价、拟报单价、投标吨价<br>
+            自制 vs 外购占比条形图，颜色区分蓝色（自制）和琥珀色（外购）<br>
+            点击重量旁边的 <code style="background:var(--panel-alt);padding:1px 5px;border-radius:3px;">→</code> 按钮可跳转到对应设备的材料明细表
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:12px 16px;background:var(--panel-alt);cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;list-style:none;">
+            <span>📋</span> 材料明细 — BOM 成本录入（最核心模块）
+          </summary>
+          <div style="padding:14px 16px;font-size:12.5px;line-height:1.8;color:var(--text);">
+            分为：水轮机 / 发电机 / 进水阀(参考) / 阀门整机 四个子标签<br>
+            采用<strong>树状层级结构</strong>，序号如 "一→1→1.1→1.1.1" 表示层级关系<br>
+            <strong>蓝色汇总行</strong>（序号为"一"或纯数字的行）自动汇总子行数据，不可手动编辑金额<br>
+            <strong>材料选择：</strong>单击"材料"列，弹出材料库选择器，支持分类浏览和搜索<br>
+            <strong>利用率：</strong>取自材料明细行；金额 = 重量 ÷ 利用率 × 材料库标准价格，自动计算<br>
+            <strong>自制/外购：</strong>点击"类别"列可切换，外购件会被单独汇总到外购成本<br>
+            底部"修复汇总"按钮可修正因手动编辑导致的汇总数据不一致问题
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:12px 16px;background:var(--panel-alt);cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;list-style:none;">
+            <span>🔧</span> 备件工具 — 备品备件与专用工具清单
+          </summary>
+          <div style="padding:14px 16px;font-size:12.5px;line-height:1.8;color:var(--text);">
+            分水机/发机/阀门三个子标签<br>
+            <strong>数量列</strong>只显示纯数字，<strong>单位列</strong>单独显示（套/台套/把等）<br>
+            备件表：记录各备件名称、规格、数量单位、自制金额、外购金额<br>
+            工具表：额外有重量字段，影响运输费计算<br>
+            阀门备件/工具金额单位为<strong>元</strong>（其余为万元），汇总时自动换算
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:12px 16px;background:var(--panel-alt);cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;list-style:none;">
+            <span>🤖</span> 自动化/监测 — 元件清单与在线监测设备
+          </summary>
+          <div style="padding:14px 16px;font-size:12.5px;line-height:1.8;color:var(--text);">
+            <strong>主机自动化：</strong>列出各传感器、阀门、变送器等元件的型号、单价、数量、合价<br>
+            <strong>在线监测：</strong>振摆监测、局放监测、气隙监测等系统设备<br>
+            两张表的金额均为<strong>元</strong>，汇总时换算为万元显示<br>
+            支持关键字搜索（元件名称/型号/制造厂）
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:12px 16px;background:var(--panel-alt);cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;list-style:none;">
+            <span>🚛</span> 运输费 — 自动计算运输成本
+          </summary>
+          <div style="padding:14px 16px;font-size:12.5px;line-height:1.8;color:var(--text);">
+            根据左侧面板的运输参数自动计算，显示详细的运费拆解：<br>
+            总重量 → 附加后实际运输重量 → 超宽件/普通件分别计费 → 汇总运费<br>
+            运费 = 普通件重量 × 普通单价 × 距离 + 超宽件重量 × 超宽单价 × 距离
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:12px 16px;background:var(--panel-alt);cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;list-style:none;">
+            <span>🎯</span> 竞价分析 — 报价策略与胜率预测
+          </summary>
+          <div style="padding:14px 16px;font-size:12.5px;line-height:1.8;color:var(--text);">
+            <strong>胜率仪表盘：</strong>基于报价/成本比例的经验模型预测中标概率<br>
+            <strong>最低可报价：</strong>保本线（成本价），低于此价亏损<br>
+            <strong>建议报价区间：</strong>在保本线基础上加合理利润的区间<br>
+            <strong>敏感度分析：</strong>各成本项目对总价的影响权重<br>
+            <strong>价格阶梯模拟：</strong>不同报价下利润和胜率的变化曲线<br>
+            <strong>报价策略建议：</strong>根据当前成本结构自动生成文字建议
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:12px 16px;background:var(--panel-alt);cursor:pointer;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;list-style:none;">
+            <span>🗄️</span> 材料库 — 管理材料标准价格数据库
+          </summary>
+          <div style="padding:14px 16px;font-size:12.5px;line-height:1.8;color:var(--text);">
+            维护材料名称、分类、标准价格（万/T）的基础数据；利用率只保存在材料明细行中<br>
+            <strong>一键导入：</strong>从 Excel 文件批量导入材料价格，支持冲突预览<br>
+            <strong>批量更新：</strong>根据材料库的最新价格批量更新材料明细表中的金额<br>
+            <strong>导出：</strong>将材料库导出为 Excel 文件<br>
+            材料库中的数据会在"材料明细"编辑时的下拉选择中显示
+          </div>
+        </details>
+
+      </div>
+    </div>
+
+    <!-- Section 6: Save & Export -->
+    <div class="card" id="manual-save">
+      <div class="card-title">⑥ 保存与导出</div>
+      <div class="card-subtitle">数据持久化和文件管理</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text);">保存方式</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="padding:10px 14px;background:var(--accent-light);border:1px solid var(--accent);border-radius:8px;">
+              <div style="font-size:12.5px;font-weight:700;color:var(--accent-dark);margin-bottom:4px;">💾 保存按钮（推荐）</div>
+              <div style="font-size:12px;color:var(--text);">点击顶部「💾 保存」按钮，将所有表格数据和参数<strong>嵌入到 HTML 文件中</strong>下载，下次打开该文件时数据完全恢复。适合存档和分享。</div>
+            </div>
+            <div style="padding:10px 14px;background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;">
+              <div style="font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:4px;">🔄 自动保存</div>
+              <div style="font-size:12px;color:var(--text);">每次编辑后数据自动保存到浏览器 <strong>localStorage</strong>，关闭后重新打开同一 HTML 文件数据也会恢复（同一浏览器、同一文件路径）。</div>
+            </div>
+            <div style="padding:10px 14px;background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;">
+              <div style="font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:4px;">📤 导出 CSV</div>
+              <div style="font-size:12px;color:var(--text);">顶部「导出CSV」按钮可将当前材料明细数据导出为 CSV 格式，可用 Excel 打开查看。</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text);">快捷键</div>
+          <table style="font-size:12.5px;width:100%;border-collapse:collapse;">
+            <tr style="background:var(--panel-alt);">
+              <th style="padding:7px 10px;border:1px solid var(--border);text-align:left;">快捷键</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);text-align:left;">功能</th>
+            </tr>
+            <tr>
+              <td style="padding:7px 10px;border:1px solid var(--border);font-family:monospace;color:var(--blue);">Ctrl + S</td>
+              <td style="padding:7px 10px;border:1px solid var(--border);">保存 HTML 文件（含全部数据）</td>
+            </tr>
+            <tr style="background:var(--panel-alt);">
+              <td style="padding:7px 10px;border:1px solid var(--border);font-family:monospace;color:var(--blue);">Alt + 1~9</td>
+              <td style="padding:7px 10px;border:1px solid var(--border);">快速切换到对应编号的 Tab 页</td>
+            </tr>
+            <tr>
+              <td style="padding:7px 10px;border:1px solid var(--border);font-family:monospace;color:var(--blue);">🌙 按钮</td>
+              <td style="padding:7px 10px;border:1px solid var(--border);">切换暗色/亮色主题</td>
+            </tr>
+          </table>
+          <div style="background:var(--red-light);border-left:3px solid var(--red);border-radius:0 6px 6px 0;padding:9px 12px;font-size:11.5px;color:var(--text);margin-top:12px;">
+            ⚠️ <strong>注意：</strong>浏览器 localStorage 存储有限，数据量大时建议定期点击「💾 保存」生成带数据的 HTML 文件存档，不要只依赖 localStorage。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 7: Scenarios -->
+    <div class="card" id="manual-scenarios">
+      <div class="card-title">⑦ 方案对比功能</div>
+      <div class="card-subtitle">保存多个报价方案并横向对比</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
+        <div>
+          <div style="font-size:12.5px;line-height:1.9;color:var(--text);">
+            <strong>使用场景：</strong>当需要对同一项目制定"激进报价"、"保守报价"、"最优报价"等多套方案时，可以使用方案对比功能。<br><br>
+            <strong>操作步骤：</strong><br>
+            ① 调整好左侧参数（加价率、运输等）<br>
+            ② 点击左侧「保存当前方案」或浮动按钮 💾<br>
+            ③ 输入方案名称（如"激进方案 -5%"）<br>
+            ④ 切换参数后继续保存第二个方案<br>
+            ⑤ 在「方案对比」Tab 查看横向对比表格<br><br>
+            最多可保存 <strong>8 个方案</strong>，支持删除和加载（点击加载可恢复为该方案的参数）。
+          </div>
+        </div>
+        <div style="background:var(--panel-alt);border-radius:8px;padding:14px;">
+          <div style="font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:10px;">对比表包含的维度</div>
+          <div style="display:flex;flex-direction:column;gap:5px;">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);">
+              <span style="width:8px;height:8px;background:var(--blue);border-radius:50%;flex-shrink:0;"></span>投标总价（万元）
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);">
+              <span style="width:8px;height:8px;background:var(--blue);border-radius:50%;flex-shrink:0;"></span>单台报价
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);">
+              <span style="width:8px;height:8px;background:var(--blue);border-radius:50%;flex-shrink:0;"></span>总固定成本
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);">
+              <span style="width:8px;height:8px;background:var(--amber);border-radius:50%;flex-shrink:0;"></span>消化占比（利润率）
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);">
+              <span style="width:8px;height:8px;background:var(--amber);border-radius:50%;flex-shrink:0;"></span>自制/外购加价率
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);">
+              <span style="width:8px;height:8px;background:var(--green);border-radius:50%;flex-shrink:0;"></span>运输费
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);">
+              <span style="width:8px;height:8px;background:var(--green);border-radius:50%;flex-shrink:0;"></span>备件/工具/服务费
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 8: FAQ -->
+    <div class="card" id="manual-faq">
+      <div class="card-title">⑧ 常见问题 FAQ</div>
+      <div class="card-subtitle">使用中遇到的典型问题与解答</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:11px 16px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text);background:var(--panel-alt);list-style:none;display:flex;align-items:center;gap:8px;">
+            <span style="color:var(--blue);font-size:16px;">Q</span> 为什么修改了材料数据，左侧参数没有变化？
+          </summary>
+          <div style="padding:12px 16px;font-size:12.5px;line-height:1.8;color:var(--text);">
+            左侧面板的重量/金额字段标注为"自动汇总"的（绿色边框）会随材料明细的修改实时更新。如果发现数据不一致，可点击左侧一致性警告横幅中的「一键修复所有不一致」按钮，或到材料明细底部点击「修复汇总」。
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:11px 16px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text);background:var(--panel-alt);list-style:none;display:flex;align-items:center;gap:8px;">
+            <span style="color:var(--blue);font-size:16px;">Q</span> 材料明细中有 ⚠ 红色警告图标是什么意思？
+          </summary>
+          <div style="padding:12px 16px;font-size:12.5px;line-height:1.8;color:var(--text);">
+            表示该<strong>汇总行</strong>的重量或金额与其子行数据之和不一致。通常是手动修改了汇总行，或子行数据变动后未重新汇总。鼠标悬停在 ⚠ 上可查看期望值，点击「修复汇总」自动修正。
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:11px 16px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text);background:var(--panel-alt);list-style:none;display:flex;align-items:center;gap:8px;">
+            <span style="color:var(--blue);font-size:16px;">Q</span> 阀门备件和工具的金额怎么是"元"不是"万元"？
+          </summary>
+          <div style="padding:12px 16px;font-size:12.5px;line-height:1.8;color:var(--text);">
+            阀门备件（valve_parts）和阀门工具（valve_tools）的金额字段原始单位为<strong>元</strong>，而水机/发机备件工具为<strong>万元</strong>。系统在汇总时会自动将元值除以 10000 换算为万元。表格下方的汇总信息会同时显示原始元值和换算后的万元值。
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:11px 16px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text);background:var(--panel-alt);list-style:none;display:flex;align-items:center;gap:8px;">
+            <span style="color:var(--blue);font-size:16px;">Q</span> 数据丢失了，如何恢复？
+          </summary>
+          <div style="padding:12px 16px;font-size:12.5px;line-height:1.8;color:var(--text);">
+            如果使用了「💾 保存」下载过 HTML 文件，直接打开该文件即可恢复所有数据。如果只依赖 localStorage 但数据丢失（清除浏览器数据、换浏览器等），则无法恢复。<strong>建议定期点击「💾 保存」生成存档文件。</strong>
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <summary style="padding:11px 16px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text);background:var(--panel-alt);list-style:none;display:flex;align-items:center;gap:8px;">
+            <span style="color:var(--blue);font-size:16px;">Q</span> 如何重置某张表格到初始数据？
+          </summary>
+          <div style="padding:12px 16px;font-size:12.5px;line-height:1.8;color:var(--text);">
+            在对应表格下方的「恢复默认」按钮，可以将该表格恢复到系统内置的初始数据（那读电站原始数据）。左侧参数面板中也有「重置默认值」按钮，恢复所有参数到默认值。<strong>注意这会清除该表格所有自定义修改。</strong>
+          </div>
+        </details>
+
+      </div>
+
+      <!-- Footer note -->
+      <div style="margin-top:16px;padding:14px 16px;background:var(--panel-alt);border-radius:8px;display:flex;align-items:center;gap:12px;">
+        <span style="font-size:24px;">💡</span>
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.7;">
+          <strong style="color:var(--text);">使用建议：</strong>首次使用建议先在「三大主机」Tab 确认设备配置，再到「材料明细」录入各零部件数据，最后通过「概览」查看汇总结果，利用「竞价分析」确定最终投标价格，并用「方案对比」保存多套方案供决策参考。
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end page-manual -->
+
+</main>
+</div>
+
+<!-- ===== 浮动操作按钮 ===== -->
+<div class="fab-group" id="fabGroup">
+  <button class="fab fab-sub" onclick="saveScenario()" title="保存方案">
+    💾<span class="fab-tooltip">保存当前方案</span>
+  </button>
+  <button class="fab fab-sub" onclick="document.querySelector('[data-page=bidanalysis]').click()" title="竞价分析">
+    🎯<span class="fab-tooltip">竞价分析</span>
+  </button>
+  <button class="fab fab-sub" onclick="scrollTo(0,0)" title="回到顶部">
+    ⬆️<span class="fab-tooltip">回到顶部</span>
+  </button>
+  <button class="fab fab-main" onclick="renderAll();showToast('✅ 已刷新所有数据')" title="刷新数据">
+    🔄<span class="fab-tooltip">刷新计算</span>
+  </button>
+</div>
+
+
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/app.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
