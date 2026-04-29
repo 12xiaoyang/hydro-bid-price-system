@@ -541,12 +541,13 @@ tr.subtotal-root td {
   background: linear-gradient(90deg, #dde8ff 0%, #edf3ff 100%);
   font-weight: 700; font-size: 13px;
   border-top: 2px solid var(--blue);
-  border-bottom: 1px solid rgba(85,128,240,0.3);
+  border-bottom: 2px solid var(--blue);
   color: var(--blue);
 }
 [data-theme="dark"] tr.subtotal-root td {
   background: linear-gradient(90deg, rgba(85,128,240,0.15) 0%, rgba(85,128,240,0.06) 100%);
   color: #7da8f8;
+  border-bottom: 2px solid var(--blue);
 }
 /* 一级 subtotal：如"1","2" */
 tr.subtotal td {
@@ -605,18 +606,16 @@ tr.subtotal-root:hover .et-child-count { color: var(--text-muted); }
 .et-level-dot.d2 { width: 5px; height: 5px; background: var(--blue); opacity: 0.6; }
 .et-level-dot.d3 { width: 4px; height: 4px; background: var(--text-dim); opacity: 0.5; }
 .et-level-dot.d4 { width: 3px; height: 3px; background: var(--text-dim); opacity: 0.4; }
-/* 左侧层级引导线 */
-.et-tree-line {
-  position: relative;
-}
-/* 子行左边界树形连接线 */
+/* All rows: uniform 3px left border for alignment — subtotals color it, leaves keep it transparent */
 tr.subtotal td:first-child,
+tr.subtotal-root td:first-child,
 tr:not(.subtotal):not(.subtotal-root) td:first-child {
-  border-left: 2px solid transparent;
+  border-left: 3px solid transparent;
 }
 tr.subtotal td:first-child { border-left: 3px solid var(--blue) !important; }
 tr.subtotal-deep td:first-child { border-left: 3px solid rgba(85,128,240,0.4) !important; }
-tr.subtotal-deep3 td:first-child { border-left: 2px solid rgba(85,128,240,0.25) !important; }
+tr.subtotal-deep3 td:first-child { border-left: 3px solid rgba(85,128,240,0.25) !important; }
+tr.subtotal-root td:first-child { border-left: 3px solid var(--blue) !important; }
 /* 父行悬停自身增强 */
 tr.subtotal:hover td { background: rgba(85,128,240,0.08) !important; cursor: default; }
 tr.subtotal-root:hover td { filter: brightness(0.95); cursor: default; }
@@ -721,7 +720,7 @@ tr.subtotal-root.inconsistent td { background: var(--red-light); border-color: v
 }
 /* 材料明细固定窄列：使用 min-width 而非 width，避免留白 */
 #matTable col.mat-op    { width: 88px; }
-#matTable col.mat-seq   { width: 68px; }
+#matTable col.mat-seq   { width: 78px; }
 #matTable col.mat-name  { min-width: 160px; }
 #matTable col.mat-mat   { min-width: 110px; }
 #matTable col.mat-rep   { min-width: 80px; }

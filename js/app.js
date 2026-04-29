@@ -2933,11 +2933,23 @@ window.EditableTable = EditableTable;
     const seqLabel = row ? (row.seq || row.name || `第${_ctxIdx+1}行`) : '';
     document.getElementById('ctx-row-label').textContent = `行: ${String(seqLabel).slice(0,20)}`;
 
-    // Show/hide expand/collapse based on whether row has children
+    // Show/hide expand/collapse: only for nodes with >=2 direct children
     const items = DATA[dataKey] || [];
-    const hasChildren = items.some(r => r !== row && String(r.seq || '').startsWith(_ctxSeq + '.'));
-    document.getElementById('ctx-expand').style.display = hasChildren ? '' : 'none';
-    document.getElementById('ctx-collapse').style.display = hasChildren ? '' : 'none';
+    let directKids;
+    if (_ctxSeq === '一') {
+      // Root 「一」: direct children are top-level numbers like "1","2"
+      directKids = items.filter(r => /^\d+$/.test(String(r.seq || ''))).length;
+    } else {
+      const pfx = _ctxSeq + '.';
+      const depth = _ctxSeq.split('.').length;
+      directKids = items.filter(r => {
+        const rs = String(r.seq || '');
+        return rs.startsWith(pfx) && rs.split('.').length === depth + 1;
+      }).length;
+    }
+    const hasAnyChildren = directKids >= 1;
+    document.getElementById('ctx-expand').style.display = hasAnyChildren ? '' : 'none';
+    document.getElementById('ctx-collapse').style.display = hasAnyChildren ? '' : 'none';
 
     menu.style.display = 'block';
     const vw = window.innerWidth, vh = window.innerHeight;
@@ -2982,18 +2994,33 @@ window.EditableTable = EditableTable;
 
   function toggleAllChildren(dk, seq, collapse) {
     const items = DATA[dk] || [];
-    // Find all descendant seqs
+    // Only toggle nodes that have >=1 direct children (same rule as arrow display)
+    const countKids = (s) => {
+      if (s === '一') {
+        return items.filter(r => /^\d+$/.test(String(r.seq || ''))).length;
+      }
+      const pfx = s + '.';
+      const d = s.split('.').length;
+      return items.filter(r => {
+        const rs = String(r.seq || '');
+        return rs.startsWith(pfx) && rs.split('.').length === d + 1;
+      }).length;
+    };
+    // Find all descendant seqs with >=1 child
     items.forEach(r => {
       const s = String(r.seq || '');
-      if (s.startsWith(seq + '.')) {
+      if (s.startsWith(seq + '.') && countKids(s) >= 1) {
         const key = `et_collapsed_${dk}_${s}`;
         if (collapse) sessionStorage.setItem(key, '1');
         else sessionStorage.removeItem(key);
       }
     });
-    const key = `et_collapsed_${dk}_${seq}`;
-    if (collapse) sessionStorage.setItem(key, '1');
-    else sessionStorage.removeItem(key);
+    // Also toggle the current node if it has >=1 child
+    if (countKids(seq) >= 1) {
+      const key = `et_collapsed_${dk}_${seq}`;
+      if (collapse) sessionStorage.setItem(key, '1');
+      else sessionStorage.removeItem(key);
+    }
     const cfg = _tableConfigs[Object.keys(_tableConfigs).find(k => _tableConfigs[k].dataKey === dk)];
     if (cfg) EditableTable.render(cfg);
   }

@@ -391,6 +391,20 @@ const EditableTable = {
       return allRows.some(other => other !== item && String(other.seq || '').startsWith(prefix));
     }
 
+    // Count direct children (one level deeper, not all descendants)
+    function countDirectChildren(seqStr, allRows) {
+      if (!seqStr || seqStr === '一') {
+        // Root 「一」: direct children are top-level numbers like "1", "2"
+        return allRows.filter(r => /^\d+$/.test(String(r.seq || ''))).length;
+      }
+      const pfx = seqStr + '.';
+      const depth = seqStr.split('.').length;
+      return allRows.filter(r => {
+        const os = String(r.seq || '');
+        return os.startsWith(pfx) && os.split('.').length === depth + 1;
+      }).length;
+    }
+
     // Compute depth from seq string: "1"=1, "1.1"=2, "1.1.1"=3, "一"=0
     function seqDepth(seqStr) {
       if (!seqStr || seqStr === '一') return 0;
@@ -406,6 +420,10 @@ const EditableTable = {
     // Check if row should be hidden (ancestor is collapsed)
     function isHidden(item) {
       const seqStr = String(item.seq || '');
+      // Root 「一」 itself is never hidden; its collapse hides children only
+      if (seqStr === '一') return false;
+      // Check root 「一」 collapse — hides all descendants
+      if (isCollapsed('一')) return true;
       const parts = seqStr.split('.');
       // Check if any ancestor seq is collapsed
       for (let len = 1; len < parts.length; len++) {
@@ -422,7 +440,9 @@ const EditableTable = {
       const isSub = isMatBOM ? isSubtotalRow(it, allItems) : isParentRow(it, allItems);
       const dotDepth = isRoot ? 0 : seqDepth(seqStr);
       const isInconsistent = isMatBOM && isSub && issueSet.has(origIdx);
-      const hasChildren = isParentRow(it, allItems);
+      const directChildCount = countDirectChildren(seqStr, allItems);
+      const hasToggle = directChildCount >= 1;  // Show arrow when any child exists
+      const hasChildren = directChildCount >= 1;
       const hidden = isHidden(it);
 
       // Row class hierarchy
@@ -437,23 +457,15 @@ const EditableTable = {
       if (isInconsistent) rowClass += ' inconsistent';
       if (hidden) rowClass += ' et-row-hidden';
 
-      // Indent: always indent by depth, for all tables
+      // Indent: root=0, level-1=32px (4 spaces under 「一」), deeper=+20px per level
       const INDENT_PX = 20;
-      const indent = isRoot ? 0 : Math.max(0, dotDepth - 1) * INDENT_PX;
+      const ROOT_CHILD_BASE = 32;  // 4 spaces indent for 「一」's direct children
+      const indent = isRoot ? 0 : ROOT_CHILD_BASE + Math.max(0, dotDepth - 1) * INDENT_PX;
 
-      // Expand/collapse button for parent rows
+      // Expand/collapse button: only for nodes with ≥2 direct children
       const collapsed = isCollapsed(seqStr);
-      // Count direct children for badge
-      const childCount = hasChildren ? (() => {
-        const pfx = seqStr + '.';
-        const depth = seqStr.split('.').length;
-        return allItems.filter(other => {
-          const os = String(other.seq || '');
-          return os.startsWith(pfx) && os.split('.').length === depth + 1;
-        }).length;
-      })() : 0;
-      const toggleBtn = hasChildren
-        ? `<button class="et-toggle-btn${collapsed ? ' collapsed' : ''}" onclick="EditableTable.toggleCollapse('${dataKey}','${seqStr}',this)" title="${collapsed ? '展开 ' + childCount + ' 个子行' : '收起 ' + childCount + ' 个子行'}">${collapsed ? '▶' : '▼'}</button>`
+      const toggleBtn = hasToggle
+        ? `<button class="et-toggle-btn${collapsed ? ' collapsed' : ''}" onclick="EditableTable.toggleCollapse('${dataKey}','${seqStr}',this)" title="${collapsed ? '展开 ' + directChildCount + ' 个子行' : '收起 ' + directChildCount + ' 个子行'}">${collapsed ? '▶' : '▼'}</button>`
         : `<span style="display:inline-block;width:22px;"></span>`;
 
       // Level indicator dot for child rows
@@ -501,9 +513,9 @@ const EditableTable = {
           html += `<span style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle;">${toggleBtn}${levelDot}</span>`;
         }
         html += EditableTable.cellDisplay(val, col);
-        // Child count badge after seq value for parent rows
-        if (col.key === 'seq' && hasChildren && childCount > 0) {
-          html += `<span class="et-child-count">${childCount}</span>`;
+        // Child count badge: only when ≥2 children (count is informative)
+        if (col.key === 'seq' && directChildCount >= 2) {
+          html += `<span class="et-child-count">${directChildCount}</span>`;
         }
         html += `</td>`;
       });
