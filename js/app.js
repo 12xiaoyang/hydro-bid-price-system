@@ -3062,4 +3062,32 @@ function updatePageTitle() {
 }
 document.getElementById('projectName').addEventListener('input', updatePageTitle);
 updatePageTitle();
-</script>
+
+// ============ 侧边栏折叠/展开 ============
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const main = document.querySelector('.main');
+  const btn = document.getElementById('sidebarToggle');
+  const isCollapsed = sidebar.classList.toggle('collapsed');
+  main.classList.toggle('sidebar-collapsed', isCollapsed);
+  btn.textContent = isCollapsed ? '▶' : '◀';
+  btn.title = isCollapsed ? '展开侧边栏' : '隐藏侧边栏';
+  try { localStorage.setItem('hydro_sidebar_collapsed', isCollapsed ? '1' : '0'); } catch(e) {}
+  // 触发 resize 让表格自适应
+  window.dispatchEvent(new Event('resize'));
+}
+// 恢复侧边栏状态
+(function restoreSidebar() {
+  try {
+    const saved = localStorage.getItem('hydro_sidebar_collapsed');
+    if (saved === '1') {
+      const sidebar = document.getElementById('sidebar');
+      const main = document.querySelector('.main');
+      const btn = document.getElementById('sidebarToggle');
+      sidebar.classList.add('collapsed');
+      main.classList.add('sidebar-collapsed');
+      btn.textContent = '▶';
+      btn.title = '展开侧边栏';
+    }
+  } catch(e) {}
+})();

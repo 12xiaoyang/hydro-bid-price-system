@@ -16,3 +16,17 @@ node_modules/
 
 # Project
 *.project.json
+
+# Excel data files
+*.xlsx
+~$*.xlsx
+
+# Screenshots
+*.png
+
+# Claude memory
+c--Users-Yang-Desktop---------------Pro-files/
+
+# Test config
+package.json
+package-lock.json
