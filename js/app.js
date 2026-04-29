@@ -30,11 +30,11 @@ let _isRestoringSnapshot = false;
 function stableClone(obj) { try { if (typeof structuredClone === 'function') return structuredClone(obj); } catch(e) {} return JSON.parse(JSON.stringify(obj)); }
 function getProjectDataTables() { const out = {}; PROJECT_DATA_KEYS.forEach(k => { if (DATA[k]) out[k] = stableClone(DATA[k]); }); return out; }
 function captureProjectState() {
-  return { app: 'hydro-bid-price-analysis-system', version: PROJECT_EXPORT_VERSION, exportedAt: new Date().toISOString(), data: getProjectDataTables(), _sidebar: captureSidebarState(), _customFormulas: stableClone(CUSTOM_FORMULAS || {}), _state: { hasWater: state.hasWater, hasGen: state.hasGen, hasValve: state.hasValve, scenarios: stableClone(state.scenarios || []), currentMatTab: state.currentMatTab, currentPartsTab: state.currentPartsTab, currentToolsTab: state.currentToolsTab }, _matLib: typeof MAT_LIB !== 'undefined' ? stableClone(MAT_LIB).map(({usage_rate, default_usage, u, ...m}) => m) : [], _importLog: typeof MAT_IMPORT_LOG !== 'undefined' ? stableClone(MAT_IMPORT_LOG) : [] };
+  return { app: 'hydro-bid-price-analysis-system', version: PROJECT_EXPORT_VERSION, exportedAt: new Date().toISOString(), data: getProjectDataTables(), _sidebar: captureSidebarState(), _customFormulas: stableClone(CUSTOM_FORMULAS || {}), _state: { hasWater: state.hasWater, hasGen: state.hasGen, hasValve: state.hasValve, scenarios: stableClone(state.scenarios || []), currentMatTab: state.currentMatTab, currentPartsTab: state.currentPartsTab, currentToolsTab: state.currentToolsTab }, _matLib: typeof MAT_LIB !== 'undefined' ? stableClone(MAT_LIB) : [], _importLog: typeof MAT_IMPORT_LOG !== 'undefined' ? stableClone(MAT_IMPORT_LOG) : [] };
 }
 function normalizeImportedProject(input) {
   const raw = input && typeof input === 'object' ? input : {}; const data = raw.data && typeof raw.data === 'object' ? raw.data : raw;
-  const out = { app: raw.app || 'hydro-bid-price-analysis-system', version: raw.version || 'legacy', data: {}, _sidebar: raw._sidebar || data._sidebar || null, _state: raw._state || data._state || {}, _matLib: (raw._matLib || data._matLib || []).map(({usage_rate, default_usage, u, ...m}) => m), _importLog: raw._importLog || data._importLog || [] };
+  const out = { app: raw.app || 'hydro-bid-price-analysis-system', version: raw.version || 'legacy', data: {}, _sidebar: raw._sidebar || data._sidebar || null, _state: raw._state || data._state || {}, _matLib: (raw._matLib || data._matLib || []), _importLog: raw._importLog || data._importLog || [] };
   PROJECT_DATA_KEYS.forEach(k => { if (Array.isArray(data[k])) out.data[k] = data[k]; });
   if (!Array.isArray(out._state.scenarios) && Array.isArray(data.scenarios)) out._state.scenarios = data.scenarios;
   return out;
@@ -43,7 +43,7 @@ function restoreProjectState(projectPackage, opts = {}) {
   const pkg = normalizeImportedProject(projectPackage); _isRestoringSnapshot = true;
   try {
     PROJECT_DATA_KEYS.forEach(k => { if (pkg.data && Array.isArray(pkg.data[k])) DATA[k] = stableClone(pkg.data[k]); });
-    if (pkg._matLib && typeof MAT_LIB !== 'undefined' && Array.isArray(pkg._matLib)) { MAT_LIB.length = 0; pkg._matLib.forEach(({usage_rate, default_usage, u, ...m}) => MAT_LIB.push(m)); _matLibNextId = Math.max(0, ...MAT_LIB.map(m => parseInt(String(m.id || 'MAT-0000').replace('MAT-',''), 10) || 0)) + 1; try { localStorage.setItem('hydro_mat_lib', JSON.stringify(MAT_LIB)); } catch(e) {} }
+    if (pkg._matLib && typeof MAT_LIB !== 'undefined' && Array.isArray(pkg._matLib)) { MAT_LIB.length = 0; pkg._matLib.forEach(m => MAT_LIB.push(m)); _matLibNextId = Math.max(0, ...MAT_LIB.map(m => parseInt(String(m.id || 'MAT-0000').replace('MAT-',''), 10) || 0)) + 1; try { localStorage.setItem('hydro_mat_lib', JSON.stringify(MAT_LIB)); } catch(e) {} }
     if (pkg._importLog && typeof MAT_IMPORT_LOG !== 'undefined' && Array.isArray(pkg._importLog)) { MAT_IMPORT_LOG.length = 0; pkg._importLog.forEach(x => MAT_IMPORT_LOG.push(x)); try { localStorage.setItem('hydro_import_log', JSON.stringify(MAT_IMPORT_LOG)); } catch(e) {} }
     if (pkg._customFormulas || (pkg.data && pkg.data._customFormulas)) {
       DATA._customFormulas = stableClone(pkg._customFormulas || pkg.data._customFormulas || {});
@@ -1351,7 +1351,7 @@ function renderMaterials() {
       { key: 'replacement', label: '替代材料', type: 'material' },
       { key: 'weight', label: '重量(T)', align: 'right', type: 'weight', summary: true, summaryLabel: '总重量' },
       { key: 'amount', label: '金额(万)', align: 'right', type: 'money', formula: true, summary: true, summaryLabel: '金额合计' },
-      { key: 'usage', label: '利用率', align: 'right', type: 'usageRate' },
+      { key: 'usage', label: '利用率/数量', align: 'right', type: 'usageRate' },
       { key: 'is_buy', label: '类别', type: 'bool' },
       { key: 'remark', label: '备注' }
     ],
@@ -1767,10 +1767,10 @@ function renderMatLib() {
   let html = `<thead><tr>
     <th style="width:40px;"></th>
     <th>材料ID</th><th>材料名称</th><th>规格</th><th>分类</th>
-    <th class="num">标准价格(万/T)</th><th>备注</th>
+    <th class="num">标准价格(万/T)</th><th class="num">利用率</th><th>备注</th>
   </tr></thead><tbody>`;
   if (items.length === 0) {
-    html += `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-dim);">暂无材料数据 · 点击"一键导入材料"或"新增材料"开始</td></tr>`;
+    html += `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-dim);">暂无材料数据 · 点击"一键导入材料"或"新增材料"开始</td></tr>`;
   }
 
   // Group by category when no search and showing all / single category
@@ -1789,7 +1789,7 @@ function renderMatLib() {
       const catItems = groups[cat];
       // Category group header row
       html += `<tr style="background:var(--accent-light);cursor:pointer;" onclick="toggleMatLibGroup('${cat.replace(/'/g,"\\'")}')" title="点击展开/折叠">
-        <td colspan="7" style="padding:5px 10px;font-weight:600;font-size:12px;color:var(--accent-dark);letter-spacing:0.05em;">
+        <td colspan="8" style="padding:5px 10px;font-weight:600;font-size:12px;color:var(--accent-dark);letter-spacing:0.05em;">
           <span id="matLibGroupIcon_${cat.replace(/[^a-zA-Z0-9]/g,'_')}">▼</span>
           &nbsp;${cat}
           <span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">${catItems.length} 项</span>
@@ -1806,7 +1806,8 @@ function renderMatLib() {
           <td class="editable-cell" data-col="2" data-idx="${realIdx}" data-lib="true">${m.spec || '<span style="color:var(--text-dim);">—</span>'}</td>
           <td class="editable-cell" data-col="3" data-idx="${realIdx}" data-lib="true">${m.category}</td>
           <td class="editable-cell num" data-col="4" data-idx="${realIdx}" data-lib="true">${fmt(m.price, 4)}</td>
-          <td class="editable-cell" data-col="5" data-idx="${realIdx}" data-lib="true">${m.remark || '<span style="color:var(--text-dim);">—</span>'}</td>
+          <td class="editable-cell num" data-col="5" data-idx="${realIdx}" data-lib="true">${fmt(m.usage_rate ?? 0.8, 2)}</td>
+          <td class="editable-cell" data-col="6" data-idx="${realIdx}" data-lib="true">${m.remark || '<span style="color:var(--text-dim);">—</span>'}</td>
         </tr>`;
       });
     });
@@ -1822,7 +1823,8 @@ function renderMatLib() {
         <td class="editable-cell" data-col="2" data-idx="${realIdx}" data-lib="true">${m.spec || '<span style="color:var(--text-dim);">—</span>'}</td>
         <td class="editable-cell" data-col="3" data-idx="${realIdx}" data-lib="true">${m.category}</td>
         <td class="editable-cell num" data-col="4" data-idx="${realIdx}" data-lib="true">${fmt(m.price, 4)}</td>
-        <td class="editable-cell" data-col="5" data-idx="${realIdx}" data-lib="true">${m.remark || '<span style="color:var(--text-dim);">—</span>'}</td>
+        <td class="editable-cell num" data-col="5" data-idx="${realIdx}" data-lib="true">${fmt(m.usage_rate ?? 0.8, 2)}</td>
+        <td class="editable-cell" data-col="6" data-idx="${realIdx}" data-lib="true">${m.remark || '<span style="color:var(--text-dim);">—</span>'}</td>
       </tr>`;
     });
   }
@@ -1853,8 +1855,8 @@ window.toggleMatLibGroup = toggleMatLibGroup;
 function handleMatLibEdit(cell) {
   const idx = parseInt(cell.dataset.idx, 10);
   const colIdx = parseInt(cell.dataset.col, 10);
-  const cols = ['name', 'spec', 'category', 'price', 'remark'];
-  const colTypes = ['text', 'text', 'text', 'number', 'text'];
+  const cols = ['name', 'spec', 'category', 'price', 'usage_rate', 'remark'];
+  const colTypes = ['text', 'text', 'text', 'number', 'number', 'text'];
   const field = cols[colIdx];
   const item = MAT_LIB[idx];
   if (!item) return;
@@ -1887,7 +1889,7 @@ function handleMatLibEdit(cell) {
 function addMatLibRow() {
   const id = 'MAT-' + String(_matLibNextId).padStart(4, '0');
   _matLibNextId++;
-  MAT_LIB.push({ id, name: '新材料', spec: '', category: '其他', price: 0, remark: '' });
+  MAT_LIB.push({ id, name: '新材料', spec: '', category: '其他', price: 0, usage_rate: 0.8, remark: '' });
   persistMatLib();
   renderMatLib();
   showToast('已添加新材料: ' + id);
@@ -1903,9 +1905,9 @@ function deleteMatLibItem(idx) {
 }
 
 function exportMatLib() {
-  let csv = '﻿材料ID,材料名称,规格,分类,标准价格(万/T),备注\n';
+  let csv = '﻿材料ID,材料名称,规格,分类,标准价格(万/T),利用率,备注\n';
   MAT_LIB.forEach(m => {
-    csv += [m.id, m.name, m.spec||'', m.category, m.price, m.remark||''].map(csvEscape).join(',') + '\n';
+    csv += [m.id, m.name, m.spec||'', m.category, m.price, m.usage_rate ?? 0.8, m.remark||''].map(csvEscape).join(',') + '\n';
   });
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -1957,11 +1959,12 @@ function parseCSVRows(text) {
   // Auto-detect columns
   const header = lines[0].replace(/^﻿/, '');
   const cols = header.split(/[,\t]/).map(h => h.trim().replace(/"/g, ''));
-  // Find name and price column indices; utilization belongs to material detail rows, not the material library
+  // Find name and price column indices
   const nameIdx = cols.findIndex(c => /材料名称|名称|name|材料|material/i.test(c));
   const priceIdx = cols.findIndex(c => /价格|单价|price|万/i.test(c));
   const specIdx = cols.findIndex(c => /规格|spec/i.test(c));
   const catIdx = cols.findIndex(c => /分类|类别|category/i.test(c));
+  const usageIdx = cols.findIndex(c => /利用率|usage|usage_rate|利用系数/i.test(c));
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
     const vals = lines[i].split(/[,\t]/).map(v => v.trim().replace(/"/g, ''));
@@ -1971,6 +1974,7 @@ function parseCSVRows(text) {
       spec: specIdx >= 0 ? (vals[specIdx] || '') : '',
       category: catIdx >= 0 ? (vals[catIdx] || '其他') : '其他',
       price: priceIdx >= 0 ? (parseFloat(vals[priceIdx]) || 0) : (parseFloat(vals[1]) || 0),
+      usage_rate: usageIdx >= 0 ? (parseFloat(vals[usageIdx]) || 0.8) : 0.8,
       remark: ''
     });
   }
@@ -2078,7 +2082,7 @@ function showImportPreview(rows, fileName) {
 
   let html = `<thead><tr>
     <th style="width:30px;">#</th><th>材料名称</th><th>规格</th><th>分类</th>
-    <th class="num">价格</th><th>状态</th><th>操作</th>
+    <th class="num">价格</th><th class="num">利用率</th><th>状态</th><th>操作</th>
   </tr></thead><tbody>`;
   rows.forEach((r, i) => {
     const isConflict = conflicts.some(c => c.imported === r);
@@ -2089,6 +2093,7 @@ function showImportPreview(rows, fileName) {
       <td class="editable-cell" data-preview="${i}" data-field="spec">${r.spec||'—'}</td>
       <td class="editable-cell" data-preview="${i}" data-field="category">${r.category}</td>
       <td class="editable-cell num" data-preview="${i}" data-field="price">${fmt(r.price,4)}</td>
+      <td class="editable-cell num" data-preview="${i}" data-field="usage_rate">${fmt(r.usage_rate ?? 0.8, 2)}</td>
       <td>${status}${isConflict ? ' (已有: '+conflicts.find(c=>c.imported===r).existing.id+')' : ''}</td>
       <td><button class="btn-reset" onclick="removePreviewRow(${i})" style="font-size:11px;padding:2px 6px;">删除</button></td>
     </tr>`;
@@ -2141,18 +2146,19 @@ function confirmImport() {
       existing.price = r.price;
       if (r.spec) existing.spec = r.spec;
       if (r.category !== '其他') existing.category = r.category;
+      if (r.usage_rate !== null && r.usage_rate !== undefined) existing.usage_rate = r.usage_rate;
       updated++;
     } else {
       const id = 'MAT-' + String(_matLibNextId).padStart(4, '0');
       _matLibNextId++;
-      MAT_LIB.push({ id, name: r.name, spec: r.spec || '', category: r.category, price: r.price, remark: r.remark || '' });
+      MAT_LIB.push({ id, name: r.name, spec: r.spec || '', category: r.category, price: r.price, usage_rate: r.usage_rate ?? 0.8, remark: r.remark || '' });
       added++;
     }
   });
   // Also update MATERIAL_PRICE_DB cache entries
   _importPreview.rows.forEach(r => {
     const key = r.name.trim().replace(/\s+/g, '');
-    MATERIAL_PRICE_DB.set(key, { p: r.price });
+    MATERIAL_PRICE_DB.set(key, { p: r.price, u: r.usage_rate });
   });
   PRICE_CACHE.clear();
 
@@ -2233,7 +2239,10 @@ function findMaterialDetailDefaultUsage(materialName, dataKey, row) {
     });
   });
   candidates.sort((a,b) => b.score - a.score);
-  return candidates.length ? candidates[0].usage : null;
+  if (candidates.length) return candidates[0].usage;
+  // Fallback to material library usage_rate
+  const libMatch = lookupMatLib(mat);
+  return libMatch ? (libMatch.usage_rate ?? null) : null;
 }
 
 // ============ 材料明细表与材料库自动联动 ============

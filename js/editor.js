@@ -93,11 +93,12 @@ function openRowEditModal(kind, payload) {
       { key: 'spec', label: '规格', type: 'text', value: row.spec },
       { key: 'category', label: '分类', type: 'text', value: row.category },
       { key: 'price', label: '标准价格(万/T)', type: 'number', value: row.price },
+      { key: 'usage_rate', label: '利用率', type: 'number', value: row.usage_rate ?? 0.8 },
       { key: 'remark', label: '备注', type: 'text', value: row.remark }
     ];
     onSave = (values) => {
       let changed = false;
-      ['name','spec','category','price','remark'].forEach(k => {
+      ['name','spec','category','price','usage_rate','remark'].forEach(k => {
         if (JSON.stringify(row[k]) !== JSON.stringify(values[k])) {
           row[k] = values[k];
           changed = true;
@@ -263,7 +264,7 @@ const close = () => closeRowEditModal();
         } else {
           const n = parseFloat(raw);
           if (isNaN(n)) throw new Error(`${f.label} 必须是有效数字`);
-          if ((col.type === 'usageRate' || f.key === 'usage') && (n < 0 || n > 1)) throw new Error(`${f.label} 需在 0~1 之间`);
+          if ((col.type === 'usageRate' || f.key === 'usage') && (n < 0 || (n > 1 && n % 1 !== 0))) throw new Error(`${f.label} 需在0~1之间（利用率）或为整数（数量）`);
           values[f.key] = (col.type === 'int') ? Math.round(n) : n;
         }
       } else {
@@ -442,9 +443,18 @@ const EditableTable = {
 
       // Expand/collapse button for parent rows
       const collapsed = isCollapsed(seqStr);
+      // Count direct children for badge
+      const childCount = hasChildren ? (() => {
+        const pfx = seqStr + '.';
+        const depth = seqStr.split('.').length;
+        return allItems.filter(other => {
+          const os = String(other.seq || '');
+          return os.startsWith(pfx) && os.split('.').length === depth + 1;
+        }).length;
+      })() : 0;
       const toggleBtn = hasChildren
-        ? `<button class="et-toggle-btn${collapsed ? ' collapsed' : ''}" onclick="EditableTable.toggleCollapse('${dataKey}','${seqStr}',this)" title="${collapsed ? '展开子行' : '收起子行'}">▼</button>`
-        : `<span style="display:inline-block;width:18px;"></span>`;
+        ? `<button class="et-toggle-btn${collapsed ? ' collapsed' : ''}" onclick="EditableTable.toggleCollapse('${dataKey}','${seqStr}',this)" title="${collapsed ? '展开 ' + childCount + ' 个子行' : '收起 ' + childCount + ' 个子行'}">${collapsed ? '▶' : '▼'}</button>`
+        : `<span style="display:inline-block;width:22px;"></span>`;
 
       // Level indicator dot for child rows
       const levelDot = dotDepth === 2 ? `<span class="et-level-dot d2"></span>`
@@ -491,6 +501,10 @@ const EditableTable = {
           html += `<span style="display:inline-flex;align-items:center;gap:3px;vertical-align:middle;">${toggleBtn}${levelDot}</span>`;
         }
         html += EditableTable.cellDisplay(val, col);
+        // Child count badge after seq value for parent rows
+        if (col.key === 'seq' && hasChildren && childCount > 0) {
+          html += `<span class="et-child-count">${childCount}</span>`;
+        }
         html += `</td>`;
       });
       html += `</tr>`;
@@ -786,7 +800,15 @@ const EditableTable = {
               if (['water','gen','valve','valve_door'].includes(dataKey)) {
                 const libMatch = lookupMatLib(selectedMat);
                 if (libMatch) {
-                  if (row.usage === null || row.usage === undefined || row.usage === '') row.usage = findMaterialDetailDefaultUsage(selectedMat, dataKey, row);
+                  if (row.usage === null || row.usage === undefined || row.usage === '') {
+                    row.usage = libMatch.usage_rate ?? findMaterialDetailDefaultUsage(selectedMat, dataKey, row);
+                    // Auto-detect is_buy from usage value
+                    const u = parseFloat(row.usage);
+                    if (!isNaN(u) && (row.is_buy === null || row.is_buy === undefined || row.is_buy === '')) {
+                      if (u > 1) row.is_buy = true;
+                      else if (u > 0 && u <= 1) row.is_buy = false;
+                    }
+                  }
                   if (!row.category || row.category === '') row.category = libMatch.category;
                 }
               }
@@ -819,7 +841,14 @@ const EditableTable = {
               if (['water','gen','valve','valve_door'].includes(dataKey)) {
                 const libMatch = lookupMatLib(selectedMat);
                 if (libMatch) {
-                  if (row.usage === null || row.usage === undefined || row.usage === '') row.usage = findMaterialDetailDefaultUsage(selectedMat, dataKey, row);
+                  if (row.usage === null || row.usage === undefined || row.usage === '') {
+                    row.usage = libMatch.usage_rate ?? findMaterialDetailDefaultUsage(selectedMat, dataKey, row);
+                    const u = parseFloat(row.usage);
+                    if (!isNaN(u) && (row.is_buy === null || row.is_buy === undefined || row.is_buy === '')) {
+                      if (u > 1) row.is_buy = true;
+                      else if (u > 0 && u <= 1) row.is_buy = false;
+                    }
+                  }
                   if (!row.category || row.category === '') row.category = libMatch.category;
                 }
               }
@@ -844,7 +873,14 @@ const EditableTable = {
                   if (['water','gen','valve','valve_door'].includes(dataKey)) {
                     const libMatch = lookupMatLib(selectedMat);
                     if (libMatch) {
-                      if (row.usage === null || row.usage === undefined || row.usage === '') row.usage = findMaterialDetailDefaultUsage(selectedMat, dataKey, row);
+                      if (row.usage === null || row.usage === undefined || row.usage === '') {
+                        row.usage = libMatch.usage_rate ?? findMaterialDetailDefaultUsage(selectedMat, dataKey, row);
+                        const u = parseFloat(row.usage);
+                        if (!isNaN(u) && (row.is_buy === null || row.is_buy === undefined || row.is_buy === '')) {
+                          if (u > 1) row.is_buy = true;
+                          else if (u > 0 && u <= 1) row.is_buy = false;
+                        }
+                      }
                       if (!row.category || row.category === '') row.category = libMatch.category;
                     }
                   }
@@ -865,14 +901,14 @@ const EditableTable = {
 
     } else if (col.key === 'usage') {
       const input = document.createElement('input');
-      input.type = 'number'; input.step = '0.01'; input.min = '0'; input.max = '1';
+      input.type = 'number'; input.step = '0.01'; input.min = '0';
       input.value = oldVal !== null && oldVal !== undefined ? oldVal : '';
       cell.appendChild(input); input.focus(); input.select();
       input.addEventListener('input', () => {
         const v = parseFloat(input.value);
-        const bad = !isNaN(v) && (v < 0 || v > 1);
+        const bad = !isNaN(v) && (v < 0 || (v > 1 && v % 1 !== 0));
         input.classList.toggle('invalid', bad);
-        input.title = bad ? '材料使用率需在0~1之间' : '';
+        input.title = bad ? '利用率(0-1之间)或数量(大于1的整数)' : '';
       });
       const getUsage = () => { const r = input.value.trim(); return r === '' ? null : Math.round(parseFloat(r) * 100) / 100; };
       input.addEventListener('blur', () => commit(true, getUsage));
@@ -909,9 +945,9 @@ const EditableTable = {
         }
         if (col.type === 'usageRate') {
           const v = parseFloat(input.value);
-          const bad = !isNaN(v) && (v < 0 || v > 1);
+          const bad = !isNaN(v) && (v < 0 || (v > 1 && v % 1 !== 0));
           input.classList.toggle('invalid', bad);
-          input.title = bad ? '材料使用率需在0~1之间' : '';
+          input.title = bad ? '利用率(0-1之间)或数量(大于1的整数)' : '';
         }
       });
 
@@ -984,6 +1020,24 @@ const EditableTable = {
       if (!confirm(`确定要删除 "${name}" 吗？`)) return;
     }
     takeProjectSnapshot('删除表格行');
+    // Clean up collapse states for deleted rows
+    const collapsePrefix = `et_collapsed_${dataKey}_`;
+    const toDeleteSeqs = new Set();
+    toDeleteSeqs.add(seqStr);
+    if (deleteChildren) {
+      childIndices.forEach(i => toDeleteSeqs.add(String(items[i].seq || '')));
+    }
+    // Remove sessionStorage keys for deleted seqs and their descendants
+    for (let s = 0; s < sessionStorage.length; s++) {
+      const key = sessionStorage.key(s);
+      if (key && key.startsWith(collapsePrefix)) {
+        const storedSeq = key.substring(collapsePrefix.length);
+        if (toDeleteSeqs.has(storedSeq) || [...toDeleteSeqs].some(ds => storedSeq.startsWith(ds + '.'))) {
+          sessionStorage.removeItem(key);
+          s--; // Adjust index after removal
+        }
+      }
+    }
     if (deleteChildren) {
       // Delete in reverse order to preserve indices
       const toDelete = new Set([idx, ...childIndices]);
@@ -1194,9 +1248,19 @@ const EditableTable = {
       sessionStorage.removeItem(key);
     }
     if (btn) btn.classList.toggle('collapsed', isNowCollapsed);
-    // Re-render to apply hidden classes
-    const config = _tableConfigs[Object.keys(_tableConfigs).find(k => _tableConfigs[k].dataKey === dataKey)];
-    if (config) EditableTable.render(config);
+    // Re-render to apply hidden classes — find config by dataKey
+    const configKey = Object.keys(_tableConfigs).find(k => _tableConfigs[k].dataKey === dataKey);
+    const config = configKey ? _tableConfigs[configKey] : null;
+    if (config) {
+      EditableTable.render(config);
+    } else {
+      // Fallback: try to find the table in DOM
+      const visibleTable = document.querySelector(`table[data-datakey="${dataKey}"]`) || document.getElementById('matTable');
+      if (visibleTable) {
+        const fallbackKey = Object.keys(_tableConfigs).find(k => _tableConfigs[k].tableId === visibleTable.id);
+        if (fallbackKey) EditableTable.render(_tableConfigs[fallbackKey]);
+      }
+    }
   },
 
   addChildRow(dataKey, parentIdx) {
@@ -1236,6 +1300,9 @@ const EditableTable = {
     }
     takeProjectSnapshot('插入子行');
     items.splice(insertIdx + 1, 0, newRow);
+    // Auto-expand parent to show the new child
+    const collapseKey = `et_collapsed_${dataKey}_${parentSeq}`;
+    sessionStorage.removeItem(collapseKey);
     FormulaEngine.recalcTable(dataKey);
     persistData();
     _sidebarOverrides.clear();

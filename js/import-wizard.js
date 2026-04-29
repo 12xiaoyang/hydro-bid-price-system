@@ -11,7 +11,7 @@ const TABLE_SCHEMAS = {
     { key: 'material', label: '材料', type: 'text' },
     { key: 'replacement', label: '代用材料', type: 'text' },
     { key: 'weight', label: '重量(T)', type: 'number' },
-    { key: 'usage', label: '利用率', type: 'usageRate' },
+    { key: 'usage', label: '利用率/数量', type: 'usageRate' },
     { key: 'is_buy', label: '自制/外购', type: 'bool' },
     { key: 'amount', label: '金额(万)', type: 'money' },
     { key: 'remark', label: '备注', type: 'text' }
@@ -23,7 +23,7 @@ const TABLE_SCHEMAS = {
     { key: 'material', label: '材料', type: 'text' },
     { key: 'replacement', label: '代用材料', type: 'text' },
     { key: 'weight', label: '重量(T)', type: 'number' },
-    { key: 'usage', label: '利用率', type: 'usageRate' },
+    { key: 'usage', label: '利用率/数量', type: 'usageRate' },
     { key: 'is_buy', label: '自制/外购', type: 'bool' },
     { key: 'amount', label: '金额(万)', type: 'money' },
     { key: 'remark', label: '备注', type: 'text' }
@@ -35,7 +35,7 @@ const TABLE_SCHEMAS = {
     { key: 'material', label: '材料', type: 'text' },
     { key: 'replacement', label: '代用材料', type: 'text' },
     { key: 'weight', label: '重量(T)', type: 'number' },
-    { key: 'usage', label: '利用率', type: 'usageRate' },
+    { key: 'usage', label: '利用率/数量', type: 'usageRate' },
     { key: 'is_buy', label: '自制/外购', type: 'bool' },
     { key: 'amount', label: '金额(万)', type: 'money' },
     { key: 'remark', label: '备注', type: 'text' }
@@ -47,7 +47,7 @@ const TABLE_SCHEMAS = {
     { key: 'material', label: '材料', type: 'text' },
     { key: 'replacement', label: '代用材料', type: 'text' },
     { key: 'weight', label: '重量(T)', type: 'number' },
-    { key: 'usage', label: '利用率', type: 'usageRate' },
+    { key: 'usage', label: '利用率/数量', type: 'usageRate' },
     { key: 'is_buy', label: '自制/外购', type: 'bool' },
     { key: 'amount', label: '金额(万)', type: 'money' },
     { key: 'remark', label: '备注', type: 'text' }
@@ -154,6 +154,7 @@ const TABLE_SCHEMAS = {
     { key: 'spec', label: '规格', type: 'text' },
     { key: 'category', label: '分类', type: 'text' },
     { key: 'price', label: '标准价格(万/T)', type: 'number' },
+    { key: 'usage_rate', label: '利用率', type: 'number' },
     { key: 'remark', label: '备注', type: 'text' }
   ]}
 };
@@ -167,6 +168,7 @@ const FIELD_ALIASES = {
   replacement: ['代用','代用材料','replacement','替代','替代材料','代用材质'],
   weight: ['重量','weight','重','净重','毛重','单重','总重','T','吨','kg','千克','千克重','重量(T)','重量(t)','重量吨'],
   usage: ['利用率','usage','utilisation','材料利用率','利用系数','材料利用系数','损耗率','利用率/数量','利用率数量'],
+  usage_rate: ['利用率','usage','usage_rate','utilisation','材料利用率','利用系数','材料利用系数'],
   is_buy: ['自制/外购','自制外购','is_buy','采购','外购','自制','buy','self','采购方式','制作方式','类型','类别','来源','来源方式','标件','是否标件','标准件','是否标准件'],
   amount: ['金额','amount','总价','总金额','合价','成本','费用','cost','price','价格','万','万元','材料价格','材料价','物料价格','报价','合计(万)'],
   remark: ['备注','remark','说明','note','备注说明','附注','备注信息','备注项','备注内容','注释'],
@@ -842,8 +844,8 @@ const ImportWizard = {
       case 'usageRate': {
         const n = parseFloat(String(val).replace(/[^0-9.\-]/g, ''));
         if (isNaN(n)) return null;
-        // If value > 1, assume it's a percentage (e.g. 70 → 0.7)
-        return n > 1 ? n / 100 : n;
+        // >1 and integer: quantity; 0-1: utilization rate
+        return n;
       }
       case 'bool': {
         if (typeof val === 'boolean') return val;
@@ -937,8 +939,9 @@ const ImportWizard = {
         }
       }
       if (f.type === 'usageRate' && row[f.key] !== null && row[f.key] !== undefined) {
-        if (typeof row[f.key] !== 'number' || row[f.key] < 0 || row[f.key] > 1) {
-          row._errors.push(`${f.label}应在0-1之间`);
+        const uv = row[f.key];
+        if (typeof uv !== 'number' || uv < 0 || (uv > 1 && uv % 1 !== 0)) {
+          row._errors.push(`${f.label}应在0-1之间（利用率）或为整数（数量）`);
         }
       }
     });
@@ -1048,6 +1051,7 @@ const ImportWizard = {
           if (row.spec) MAT_LIB[existingIdx].spec = row.spec;
           if (row.category) MAT_LIB[existingIdx].category = row.category;
           if (row.price !== null && row.price !== undefined && row.price !== '') MAT_LIB[existingIdx].price = parseFloat(row.price);
+          if (row.usage_rate !== null && row.usage_rate !== undefined && row.usage_rate !== '') MAT_LIB[existingIdx].usage_rate = parseFloat(row.usage_rate);
           if (row.remark) MAT_LIB[existingIdx].remark = row.remark;
           updated++;
         } else {
@@ -1057,6 +1061,7 @@ const ImportWizard = {
             spec: row.spec || '',
             category: row.category || '其他',
             price: parseFloat(row.price) || 0,
+            usage_rate: parseFloat(row.usage_rate) || 0.8,
             remark: row.remark || ''
           });
           _matLibNextId++;

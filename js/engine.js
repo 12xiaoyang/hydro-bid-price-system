@@ -59,6 +59,7 @@ function initMatLib() {
       spec: '',
       category: guessCat(key),
       price: val.p,
+      usage_rate: 0.8,
       remark: ''
     });
     _matLibNextId++;
@@ -69,7 +70,7 @@ function initMatLib() {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        MAT_LIB = parsed.map(({ usage_rate, default_usage, u, ...m }) => m);
+        MAT_LIB = parsed;
         _matLibNextId = Math.max(...MAT_LIB.map(m => parseInt((m.id || 'MAT-0000').replace('MAT-',''), 10) || 0)) + 1;
       }
     }
@@ -238,6 +239,12 @@ const FormulaEngine = {
   // Auto-detect is_buy from sub_categories if null/undefined
   detectIsBuy(row) {
     if (row.is_buy !== null && row.is_buy !== undefined && row.is_buy !== '') return row.is_buy;
+    // Auto-detect from usage value: >1 integer → quantity (外购), 0~1 → rate (自制)
+    const u = parseFloat(row.usage);
+    if (!isNaN(u)) {
+      if (u > 1) return true;   // integer quantity → 外购
+      if (u > 0 && u <= 1) return false;  // utilization rate → 自制
+    }
     if (!row.category) return false;
     // Default categories that are typically purchased
     const buyCategories = ['阀门类','成品转轮\\成品导叶','成品矽钢片','轴瓦','轴套\\轴承','密封圈',
