@@ -1048,6 +1048,22 @@ const ImportWizard = {
       takeProjectSnapshot('Excel导入');
     }
 
+    // Log import details for diagnostics
+    console.group('📥 Excel 导入诊断');
+    console.log('目标表:', targetTable, '| 有效行数:', rows.length);
+    console.log('文件:', this._state.fileName);
+    console.log('列映射:', this._state.columnMappings.filter(m => m.systemField).map(m => m.excelHeader + '→' + m.systemField).join(', '));
+    // Trace seq hierarchy for BOM imports
+    if (['water','gen','valve','valve_door'].includes(targetTable)) {
+      const childrenOf7 = rows.filter(r => String(r.seq || '').startsWith('7.'));
+      console.log('seq 以 "7." 开头的行:', childrenOf7.length, '行', childrenOf7.map(r => r.seq + ' ' + r.name).join(', '));
+      const allSeqs = rows.map(r => String(r.seq || '')).filter(Boolean);
+      console.log('全部 seq 值:', allSeqs.join(', '));
+      const parentSeqs = [...new Set(allSeqs.filter(s => allSeqs.some(o => o !== s && o.startsWith(s + '.'))))];
+      console.log('有子节点的父级 seq:', parentSeqs.join(', '));
+    }
+    console.groupEnd();
+
     let added = 0, updated = 0;
 
     if (targetTable === 'matlib') {
@@ -1121,20 +1137,108 @@ const ImportWizard = {
 
       DATA[targetTable] = newRows;
 
+      // Log the actual row count after assignment
+      console.log('📊 DATA.' + targetTable + '.length after import:', DATA[targetTable].length, '(expected:', newRows.length, ')');
+      if (DATA[targetTable].length !== newRows.length) {
+        console.error('❌ 行数不匹配! DATA=' + DATA[targetTable].length + ' newRows=' + newRows.length);
+      }
+
       // Recalculate formulas
       FormulaEngine.recalcTable(targetTable);
 
       // For BOM tables, recalc subtotals
       if (['water','gen','valve','valve_door'].includes(targetTable)) {
         FormulaEngine.recalcSubtotals(DATA[targetTable], targetTable);
+
+        // 清理导入后无意义的空行（有名称/有材料/有重量/汇总行/外购件均保留）
+        const items = DATA[targetTable];
+        const beforeClean = items.length;
+        for (let i = items.length - 1; i >= 0; i--) {
+          const row = items[i];
+          const w = parseFloat(row.weight);
+          const hasWeight = !isNaN(w) && w > 0;
+          const isSub = isSubtotalRow(row, items);
+          const isBuy = row.is_buy === true;
+          const hasMaterial = row.material && String(row.material).trim() !== '';
+          const hasName = row.name && String(row.name).trim() !== '';
+          const isEmptyRow = !hasWeight && !isSub && !isBuy && !hasMaterial && !hasName;
+          if (isEmptyRow) {
+            items.splice(i, 1);
+          }
+        }
+        if (items.length < beforeClean) {
+          console.log('🧹 已清理 ' + (beforeClean - items.length) + ' 行无意义空数据 (保留了' + items.length + '行)');
+        }
       }
 
       persistData();
+    }
+
+    // Clear stale sessionStorage collapse states for this table
+    if (['water','gen','valve','valve_door','water_parts','gen_parts','valve_parts',
+         'water_tools','gen_tools','valve_tools','automation','monitoring','liaison'].includes(targetTable)) {
+      const prefix = `et_collapsed_${targetTable}_`;
+      Object.keys(sessionStorage).filter(k => k.startsWith(prefix)).forEach(k => sessionStorage.removeItem(k));
     }
 
     renderAll();
     showToast(`✅ 导入完成: 共覆盖 ${added} 条数据`);
     this.cancel();
   }
+};
+
+// ============ 全局诊断函数 (浏览器控制台运行) ============
+// 用法: auditBOMTable('water')  或不传参则默认检查当前激活的 BOM 表
+window.auditBOMTable = function(tableKey) {
+  tableKey = tableKey || (typeof state !== 'undefined' && state.currentMatTab) || 'water';
+  const items = DATA[tableKey];
+  if (!items || !Array.isArray(items)) {
+    console.log('❌ 表 ' + tableKey + ' 无数据');
+    return;
+  }
+  console.group('🔍 BOM 表诊断: ' + tableKey + ' (共 ' + items.length + ' 行)');
+
+  // 1. List all seq + name
+  console.log('--- 全部行 ---');
+  items.forEach((it, i) => {
+    console.log(String(i).padStart(3) + ' | seq: ' + String(it.seq || '').padEnd(8) + ' | name: ' + (it.name || '(空)') + ' | material: ' + (it.material || '').slice(0,20) + ' | weight: ' + it.weight);
+  });
+
+  // 2. Tree structure — show parent-child relationships
+  console.log('--- 树形结构 ---');
+  (function printTree(parentSeq, indent) {
+    var children = items.filter(function(it) {
+      if (!parentSeq || parentSeq === '') return /^\d+$/.test(String(it.seq || ''));
+      var c = String(it.seq || '');
+      return c.startsWith(parentSeq + '.') && c.split('.').length === parentSeq.split('.').length + 1;
+    });
+    children.forEach(function(c) {
+      var it = items.find(function(i) { return String(i.seq) === String(c.seq); });
+      console.log(indent + c.seq + ' ' + (it ? it.name : '(未找到)') + (it && it.material ? ' [' + it.material + ']' : ''));
+      printTree(c.seq, indent + '  ');
+    });
+  })('', '');
+
+  // 3. Check for potential issues
+  console.log('--- 潜在问题 ---');
+  var seqCount = {};
+  items.forEach(function(it) { var s = String(it.seq || ''); seqCount[s] = (seqCount[s] || 0) + 1; });
+  Object.keys(seqCount).filter(function(s) { return seqCount[s] > 1; }).forEach(function(s) {
+    console.warn('⚠️ 重复序号: "' + s + '" 出现 ' + seqCount[s] + ' 次');
+  });
+  items.filter(function(it) { return !it.seq && it.seq !== 0; }).forEach(function(it) {
+    console.warn('⚠️ 缺少序号: ' + (it.name || '(无名称)'));
+  });
+
+  // 4. Children count for each parent
+  console.log('--- 子节点统计 ---');
+  var parents = items.filter(function(it) { return typeof isSubtotalRow === 'function' && isSubtotalRow(it, items); });
+  parents.forEach(function(p) {
+    var count = items.filter(function(other) { return typeof isDirectChild === 'function' && isDirectChild(String(p.seq), String(other.seq || '')); }).length;
+    console.log('  seq=' + p.seq + ' ' + p.name + ' → ' + count + ' 个子节点');
+  });
+
+  console.groupEnd();
+  return items.length;
 };
 
