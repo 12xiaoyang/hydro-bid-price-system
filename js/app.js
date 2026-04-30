@@ -802,6 +802,9 @@ function validateTableConsistency(dataKey) {
   const issues = [];
   items.forEach((it, i) => {
     if (!isSubtotalRow(it, items)) return;
+    // 有材料的数据行：weight/amount 由材料公式计算，非子项聚合，跳过校验
+    const hasMaterial = it.material && String(it.material).trim() !== '';
+    if (hasMaterial) return;
     // 根节点"一"现在也参与自动汇总校验
     const parentSeq = String(it.seq);
     let expectedWeight = 0, expectedAmount = 0;
