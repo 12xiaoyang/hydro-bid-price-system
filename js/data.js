@@ -46,7 +46,7 @@ function splitQtyUnit(qtyVal, unitVal) {
 // 清理：去重所有表中的 seq 值，避免小计误算
 (function deduplicateSeqs() {
   var tables = ['water','gen','valve','valve_door','water_parts','gen_parts','valve_parts',
-                 'water_tools','gen_tools','valve_tools','automation','monitoring','liaison'];
+                 'water_tools','gen_tools','valve_tools'];
   tables.forEach(function(key) {
     var seen = {};
     (DATA[key] || []).forEach(function(row) {

@@ -818,6 +818,17 @@ const ImportWizard = {
       }
     });
 
+    // Auto-fill missing name from material for BOM rows
+    if (['water','gen','valve','valve_door'].includes(this._state.targetTable)) {
+      parsedRows.forEach(row => {
+        const hasName = row.name && String(row.name).trim() !== '';
+        if (hasName) return;
+        if (row.material && String(row.material).trim() !== '') {
+          row.name = String(row.material).trim();
+        }
+      });
+    }
+
     // Validate
     const errors = [];
     parsedRows.forEach(row => {

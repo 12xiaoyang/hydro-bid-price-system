@@ -479,6 +479,10 @@ function loadPersistedData() {
         if (DATA[key]) DATA[key] = parsed[key];
       }
       PRICE_CACHE.clear();
+      // Re-sync CUSTOM_FORMULAS reference after DATA reassignment
+      if (DATA._customFormulas && typeof DATA._customFormulas === 'object') {
+        CUSTOM_FORMULAS = DATA._customFormulas;
+      }
       for (const key of Object.keys(parsed)) {
         if (key === '_sidebar') continue;
         FormulaEngine.recalcTable(key);
@@ -504,7 +508,7 @@ const _tableConfigs = {};
 
 // Generate next sequence number after afterItem
 function generateNextSeq(items, afterItem) {
-  if (!afterItem || afterItem.seq === null || afterItem.seq === undefined) {
+  if (!afterItem || afterItem.seq === null || afterItem.seq === undefined || afterItem.seq === '') {
     return String(items.length + 1);
   }
   const afterSeq = String(afterItem.seq);
@@ -528,10 +532,22 @@ function generateNextSeq(items, afterItem) {
 
 // Generate child sequence number under a parent (e.g. "1.5" → "1.5.1")
 function generateChildSeq(items, parentItem) {
-  if (!parentItem || parentItem.seq === null || parentItem.seq === undefined) {
+  if (!parentItem || parentItem.seq === null || parentItem.seq === undefined || parentItem.seq === '') {
     return String(items.length + 1);
   }
   const parentSeq = String(parentItem.seq);
+  // Handle root "一": children are plain numbers (1, 2, 3...)
+  if (parentSeq === '一') {
+    let maxChild = 0;
+    items.forEach(it => {
+      const s = String(it.seq || '');
+      if (/^\d+$/.test(s)) {
+        const n = parseInt(s, 10);
+        if (!isNaN(n) && n > maxChild) maxChild = n;
+      }
+    });
+    return String(maxChild + 1);
+  }
   // Only applies to BOM tables with numbered seq
   const parts = parentSeq.split('.');
   if (parts.every(p => isNaN(parseInt(p, 10)))) {
@@ -3064,31 +3080,6 @@ window.confirmImport = confirmImport;
 window.jumpToMaterial = jumpToMaterial;
 window.fixAllConsistency = fixAllConsistency;
 window.handlePrint = handlePrint;
-
-// 创建材料下拉选项 datalist
-(function() {
-  const dl = document.createElement('datalist');
-  dl.id = 'materialDatalist';
-  const seen = new Set();
-  for (const key of MATERIAL_PRICE_DB.keys()) {
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const opt = document.createElement('option');
-    opt.value = key;
-    dl.appendChild(opt);
-  }
-  // Also add MAT_LIB entries
-  for (const m of MAT_LIB) {
-    if (!seen.has(m.name)) {
-      seen.add(m.name);
-      const opt = document.createElement('option');
-      opt.value = m.name;
-      dl.appendChild(opt);
-    }
-  }
-  document.body.appendChild(dl);
-})();
-
 
 // ============ 表格尺寸可调 + 记忆 ============
 const TABLE_RESIZE_STORAGE_KEY = 'hydro_table_resize_v1';
