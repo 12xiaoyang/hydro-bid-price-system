@@ -212,7 +212,9 @@ const ImportWizard = {
     parsedRows: [],
     previewRows: [],
     errors: [],
-    validated: false
+    validated: false,
+    previewPage: 1,
+    previewPageSize: 50
   },
 
   // ---------- 入口 ----------
@@ -237,7 +239,8 @@ const ImportWizard = {
       step: 0, file: null, fileName: '',
       workbook: null, sheets: [], selectedSheet: 0,
       targetTable: null, columnMappings: [],
-      parsedRows: [], previewRows: [], errors: [], validated: false
+      parsedRows: [], previewRows: [], errors: [], validated: false,
+      previewPage: 1, previewPageSize: 50
     };
   },
 
@@ -752,6 +755,7 @@ const ImportWizard = {
 
   // ---------- Step 4: 预览导入 ----------
   _goToPreview() {
+    this._state.previewPage = 1;
     const mappings = this._state.columnMappings;
     const activeMappings = mappings.filter(m => m.systemField);
     if (activeMappings.length === 0) {
@@ -962,7 +966,7 @@ const ImportWizard = {
     }
   },
 
-  _renderStep4_preview() {
+  _renderStep4_preview(page) {
     this._state.step = 4;
     this._renderStepper(4);
 
@@ -971,6 +975,14 @@ const ImportWizard = {
     const errors = this._state.errors;
     const validRows = rows.filter(r => r._valid);
     const invalidCount = errors.length;
+
+    // Pagination
+    const pageSize = this._state.previewPageSize || 50;
+    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    const currentPage = Math.max(1, Math.min(totalPages, page || this._state.previewPage || 1));
+    this._state.previewPage = currentPage;
+    const startIdx = (currentPage - 1) * pageSize;
+    const endIdx = Math.min(startIdx + pageSize, rows.length);
 
     // Preview table
     const mappedFields = this._state.columnMappings.filter(m => m.systemField).map(m => m.systemField);
@@ -983,9 +995,7 @@ const ImportWizard = {
     });
     tableHtml += '<th style="width:40px;">状态</th></tr></thead><tbody>';
 
-    // Show first 50 rows in preview
-    const previewCount = Math.min(rows.length, 50);
-    for (let i = 0; i < previewCount; i++) {
+    for (let i = startIdx; i < endIdx; i++) {
       const row = rows[i];
       tableHtml += '<tr>';
       uniqueFields.forEach(fk => {
@@ -997,8 +1007,16 @@ const ImportWizard = {
     }
     tableHtml += '</tbody></table>';
 
-    if (rows.length > 50) {
-      tableHtml += `<div style="text-align:center;font-size:12px;color:var(--text-dim);padding:8px;">仅显示前 50 行，共 ${rows.length} 行</div>`;
+    // Pagination controls (always show when > 1 page)
+    let pagerHtml = '';
+    if (totalPages > 1) {
+      const prevDisabled = currentPage <= 1 ? ' disabled' : '';
+      const nextDisabled = currentPage >= totalPages ? ' disabled' : '';
+      pagerHtml = `<div class="wizard-pager">
+        <button class="btn btn-sm${prevDisabled}" onclick="ImportWizard._renderStep4_preview(${currentPage - 1})"${prevDisabled ? '' : ''} ${prevDisabled ? 'disabled' : ''}>← 上一页</button>
+        <span class="wizard-pager-info">第 ${startIdx + 1}-${endIdx} 行，共 ${rows.length} 行 (${currentPage}/${totalPages} 页)</span>
+        <button class="btn btn-sm${nextDisabled}" onclick="ImportWizard._renderStep4_preview(${currentPage + 1})"${nextDisabled ? ' disabled' : ''}>下一页 →</button>
+      </div>`;
     }
 
     // Validation summary
@@ -1015,7 +1033,8 @@ const ImportWizard = {
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
         文件: ${this._state.fileName} → 共解析 ${rows.length} 行，有效 ${validRows.length} 行（将覆盖替换目标表全部数据）
       </div>
-      <div class="table-wrap" style="max-height:400px;">${tableHtml}</div>`);
+      <div class="table-wrap" style="max-height:400px;">${tableHtml}</div>
+      ${pagerHtml}`);
 
     const hasValid = validRows.length > 0;
     this._setFooter(`<span class="wizard-hint">${hasValid ? '确认后将覆盖替换目标表全部数据，可通过 Ctrl+Z 撤销' : '没有可导入的有效数据'}</span>

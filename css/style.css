@@ -1851,6 +1851,9 @@ tr.subtotal:hover td, tr.subtotal-deep:hover td, tr.subtotal-deep3:hover td { fi
 .wizard-preview-table td { padding: 6px 9px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
 .wizard-preview-table tbody tr:nth-child(even) td { background: var(--panel-alt); }
 .wizard-preview-table tbody tr:hover td { background: var(--panel-hover); }
+.wizard-pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 0 8px; }
+.wizard-pager-info { font-size: 12.5px; color: var(--text-dim); white-space: nowrap; }
+.wizard-pager .btn-sm { padding: 4px 14px; font-size: 12px; }
 
 /* ===== 快速查错 / 数据体检模态框 ===== */
 .health-overlay {
