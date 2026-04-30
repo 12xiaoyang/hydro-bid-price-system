@@ -257,6 +257,8 @@ const FormulaEngine = {
   // Calc material BOM amount using optimized formula
   calcMatAmount(row, dataKey) {
     if (!row.material || row.material.trim() === '') return row.amount || 0;
+    const weight = parseFloat(row.weight) || 0;
+    if (weight === 0) return 0;
     const priceInfo = lookupMaterialPrice(row.material);
     const unitPrice = priceInfo ? priceInfo.p : null;
     const isBuy = this.detectIsBuy(row);
@@ -274,9 +276,6 @@ const FormulaEngine = {
       return 0;
     }
     // Self-made: amount = material row weight ÷ material row utilization × library standard price.
-    // Utilization is row-level data from the project BOM. The material library deliberately has no default utilization.
-    const weight = parseFloat(row.weight) || 0;
-    if (weight === 0) return 0;
     const utilizationRaw = parseFloat(row.usage);
     const utilization = (!isNaN(utilizationRaw) && utilizationRaw > 0) ? utilizationRaw : 1;
     if (unitPrice !== null) {
