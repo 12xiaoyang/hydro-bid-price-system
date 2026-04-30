@@ -375,10 +375,14 @@ const FormulaEngine = {
     subtotalIndices.sort((a, b) => depth(items[b].seq) - depth(items[a].seq));
 
     // 3. 自底向上：每个父节点 = 直接子节点之和（包括根节点"一"）
+    //    但如果父节点有材料或重量（是数据行而非纯类别标题），保留原值不被覆盖
     subtotalIndices.forEach(si => {
       const parentSeq = String(items[si].seq);
-      let sumWeight = 0, sumAmount = 0;
+      const parentRow = items[si];
+      const hasMaterial = parentRow.material && String(parentRow.material).trim() !== '';
+      const hasWeight = !isNaN(parseFloat(parentRow.weight)) && parseFloat(parentRow.weight) > 0;
 
+      let sumWeight = 0, sumAmount = 0;
       items.forEach((child, ci) => {
         if (ci === si) return;
         const childSeq = String(child.seq || '');
@@ -386,6 +390,9 @@ const FormulaEngine = {
         sumWeight += parseFloat(child.weight) || 0;
         sumAmount += parseFloat(child.amount) || 0;
       });
+
+      // 数据行有自身材料和重量，不覆盖
+      if (hasMaterial || hasWeight) return;
 
       items[si].weight = parseFloat(sumWeight.toFixed(4));
       items[si].amount = parseFloat(sumAmount.toFixed(4));
