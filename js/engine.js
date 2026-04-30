@@ -266,7 +266,7 @@ const FormulaEngine = {
       const qty = (row.usage !== null && row.usage !== undefined && row.usage !== '' && !isNaN(usageVal)) ? usageVal : 1;
       if (unitPrice !== null) {
         const fallback = parseFloat((qty * unitPrice).toFixed(6));
-        return evalConfiguredFormula('mat_amount_buy', row, { price: unitPrice, material_price: unitPrice, qty }, fallback);
+        return evalConfiguredFormula('mat_amount_buy', row, { price: unitPrice, material_price: unitPrice, usage: qty }, fallback);
       }
       // No price found: keep existing amount if available, otherwise 0
       if (row.amount && row.amount > 0) return row.amount;
@@ -281,7 +281,7 @@ const FormulaEngine = {
     const utilization = (!isNaN(utilizationRaw) && utilizationRaw > 0) ? utilizationRaw : 1;
     if (unitPrice !== null) {
       const fallback = parseFloat(((weight / utilization) * unitPrice).toFixed(6));
-      return evalConfiguredFormula('mat_amount_self', row, { price: unitPrice, material_price: unitPrice, utilization }, fallback);
+      return evalConfiguredFormula('mat_amount_self', row, { price: unitPrice, material_price: unitPrice, usage: utilization }, fallback);
     }
     // No price found: keep existing amount if available
     if (row.amount && row.amount > 0) return row.amount;
@@ -375,17 +375,21 @@ const FormulaEngine = {
     subtotalIndices.sort((a, b) => depth(items[b].seq) - depth(items[a].seq));
 
     // 3. 自底向上：每个父节点 = 直接子节点之和（包括根节点"一"）
+    //    有材料的行是数据行（非纯标题），其weight/amount已由recalcTable计算，不被覆盖
     subtotalIndices.forEach(si => {
-      const parentSeq = String(items[si].seq);
-      let sumWeight = 0, sumAmount = 0;
+      const parentRow = items[si];
+      const hasMaterial = parentRow.material && String(parentRow.material).trim() !== '';
 
+      let sumWeight = 0, sumAmount = 0;
       items.forEach((child, ci) => {
         if (ci === si) return;
         const childSeq = String(child.seq || '');
-        if (!isDirectChild(parentSeq, childSeq)) return;
+        if (!isDirectChild(String(parentRow.seq), childSeq)) return;
         sumWeight += parseFloat(child.weight) || 0;
         sumAmount += parseFloat(child.amount) || 0;
       });
+
+      if (hasMaterial) return; // 数据行保留recalcTable计算值
 
       items[si].weight = parseFloat(sumWeight.toFixed(4));
       items[si].amount = parseFloat(sumAmount.toFixed(4));

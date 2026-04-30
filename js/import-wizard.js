@@ -214,7 +214,8 @@ const ImportWizard = {
     errors: [],
     validated: false,
     previewPage: 1,
-    previewPageSize: 50
+    previewPageSize: 50,
+    dupSeqs: []
   },
 
   // ---------- 入口 ----------
@@ -240,7 +241,7 @@ const ImportWizard = {
       workbook: null, sheets: [], selectedSheet: 0,
       targetTable: null, columnMappings: [],
       parsedRows: [], previewRows: [], errors: [], validated: false,
-      previewPage: 1, previewPageSize: 50
+      previewPage: 1, previewPageSize: 50, dupSeqs: []
     };
   },
 
@@ -382,7 +383,7 @@ const ImportWizard = {
       const ref = ws['!ref'];
       const rowCount = ref ? XLSX.utils.decode_range(ref).e.r + 1 : 0;
       // Parse all rows as arrays
-      const json = XLSX.utils.sheet_to_json(ws, { defval: '', header: 1 });
+      const json = XLSX.utils.sheet_to_json(ws, { defval: '', header: 1, raw: false });
 
       // Auto-detect header row: scan first 5 rows, skip title rows
       let headerIdx = 0;
@@ -839,6 +840,22 @@ const ImportWizard = {
       this._validateRow(row, this._state.targetTable, errors);
     });
 
+    // Detect duplicate seq for BOM tables (common: Excel stores 2.10 as number → JS reads 2.1)
+    let dupSeqs = [];
+    if (['water','gen','valve','valve_door'].includes(this._state.targetTable)) {
+      const seqCount = {};
+      parsedRows.forEach(row => {
+        const s = String(row.seq || '').trim();
+        if (!s) return;
+        seqCount[s] = (seqCount[s] || 0) + 1;
+      });
+      dupSeqs = Object.keys(seqCount).filter(s => seqCount[s] > 1);
+      if (dupSeqs.length > 0) {
+        console.warn('⚠️ 检测到重复序号:', dupSeqs.join(', '), '— 导入时将自动消重');
+      }
+    }
+    this._state.dupSeqs = dupSeqs;
+
     this._state.parsedRows = parsedRows;
     this._state.errors = errors;
     this._state.validated = true;
@@ -1027,6 +1044,12 @@ const ImportWizard = {
         <button class="btn" onclick="ImportWizard._removeInvalidRows()">仅导入有效行 (${validRows.length} 行)</button>
       </div>`;
     }
+    // Duplicate seq warning
+    if (this._state.dupSeqs && this._state.dupSeqs.length > 0) {
+      summaryHtml += `<div class="wizard-validation-summary" style="background:var(--red-light);border-color:var(--red);">
+        <span class="wizard-validation-count" style="color:var(--red);">🔴 检测到重复序号: ${this._state.dupSeqs.join(', ')} — 可能因Excel将序号存储为数字（如2.10→2.1），导入时将自动消重</span>
+      </div>`;
+    }
 
     this._setBody(`<div class="wizard-step-title">预览 — 将导入到「${schema.label}」</div>
       ${summaryHtml}
@@ -1153,6 +1176,33 @@ const ImportWizard = {
         newRows.push(newRow);
         added++;
       });
+
+      // Deduplicate seq for BOM tables (e.g., Excel number 2.10 → JS 2.1, collides with 2.1)
+      if (['water','gen','valve','valve_door'].includes(targetTable)) {
+        const seen = {};
+        let dedupCount = 0;
+        newRows.forEach(row => {
+          const origSeq = row.seq;
+          if (!origSeq) return;
+          const key = String(origSeq).trim();
+          if (!key) return;
+          if (seen[key]) {
+            // Generate a unique suffix
+            let suffix = 2;
+            let newSeq = key + '-' + suffix;
+            while (seen[newSeq]) { suffix++; newSeq = key + '-' + suffix; }
+            row.seq = newSeq;
+            seen[newSeq] = true;
+            dedupCount++;
+            console.log('🔧 消重序号: seq "' + key + '" → "' + newSeq + '" (' + (row.name || '(无名称)') + ')');
+          } else {
+            seen[key] = true;
+          }
+        });
+        if (dedupCount > 0) {
+          console.log('🔧 共消重 ' + dedupCount + ' 条重复序号');
+        }
+      }
 
       DATA[targetTable] = newRows;
 
