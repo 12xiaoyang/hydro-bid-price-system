@@ -147,6 +147,74 @@ function autoFixUsageRates() {
   return fixed;
 }
 
+function autoFixSequences(dataKey) {
+  if (!['water','gen','valve','valve_door'].includes(dataKey)) return { tables: 0, rows: 0 };
+  const items = DATA[dataKey];
+  if (!items || items.length === 0) return { tables: 0, rows: 0 };
+
+  // Helper: check if seq is pure numeric (e.g. "1", "2.3", "1.2.3")
+  const isNumericSeq = (s) => /^\d+(\.\d+)*$/.test(s);
+
+  let fixed = 0;
+
+  // 1. Collect all parent seqs (rows that have direct children)
+  const parentSeqs = [];
+  const allSeqs = items.map(r => r.seq).filter(s => s && isNumericSeq(String(s)));
+  allSeqs.forEach(seq => {
+    if (parentSeqs.includes(seq)) return;
+    const hasChild = allSeqs.some(other => other !== seq && String(other).startsWith(String(seq) + '.'));
+    if (hasChild) parentSeqs.push(seq);
+  });
+  // Add root "一" if it has children
+  const rootHasChild = items.some(r => /^\d+$/.test(String(r.seq || '')));
+  if (rootHasChild && !parentSeqs.includes('一')) parentSeqs.push('一');
+
+  // 2. Sort by depth descending (deepest first = bottom-up)
+  parentSeqs.sort((a, b) => {
+    const da = a === '一' ? 0 : String(a).split('.').length;
+    const db = b === '一' ? 0 : String(b).split('.').length;
+    return db - da;
+  });
+
+  // 3. Process each parent
+  parentSeqs.forEach(parentSeq => {
+    // Collect direct children (using existing isDirectChild)
+    const children = items.filter(r => {
+      const cs = String(r.seq || '');
+      return cs && isNumericSeq(cs) && isDirectChild(parentSeq, cs);
+    });
+
+    // Sort children by last segment numeric value
+    children.sort((a, b) => {
+      const segA = parseInt(String(a.seq).split('.').pop(), 10);
+      const segB = parseInt(String(b.seq).split('.').pop(), 10);
+      return (isNaN(segA) ? 0 : segA) - (isNaN(segB) ? 0 : segB);
+    });
+
+    // Renumber sequentially
+    children.forEach((child, idx) => {
+      const newSeq = parentSeq === '一' ? String(idx + 1) : parentSeq + '.' + (idx + 1);
+      const oldSeq = String(child.seq);
+      if (newSeq === oldSeq) return;
+
+      child.seq = newSeq;
+      fixed++;
+
+      // Cascade: update all descendants' prefix
+      items.forEach(r => {
+        const rs = String(r.seq || '');
+        if (rs === oldSeq) return; // skip the row itself (already updated)
+        if (rs.startsWith(oldSeq + '.')) {
+          r.seq = newSeq + rs.substring(oldSeq.length);
+        }
+      });
+    });
+  });
+
+  if (fixed > 0) persistData();
+  return { tables: fixed > 0 ? 1 : 0, rows: fixed };
+}
+
 function autoFixNegativeValues() {
   const fixed = { tables: 0, rows: 0 };
   const ALL_TABLES = PROJECT_DATA_KEYS;
