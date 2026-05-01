@@ -2,7 +2,6 @@
 // Phase 1: 导入所有模块，通过 window 暴露给内联 onclick
 
 import * as Data from './data.js';
-import { FormulaEngine } from '../engine.js';
 import { openRowEditModal, closeRowEditModal, EditableTable } from '../editor.js';
 import { ImportWizard, TABLE_SCHEMAS, FIELD_ALIASES } from '../import-wizard.js';
 import {
@@ -13,6 +12,20 @@ import {
   importFullData, loadPersistedData
 } from './persistence.js';
 import { SNAPSHOT_MAX, takeProjectSnapshot, undoProjectSnapshot, redoProjectSnapshot } from './state.js';
+
+// --- 业务逻辑 ---
+import { FormulaEngine, MAT_LIB, MAT_IMPORT_LOG,
+  getInputs, isSubtotalRow, isDirectChild,
+  aggregateMatTable, aggregatePartsTools, aggregateSimple, aggregateMatTableValve,
+  getEnabledPartsKeys, getEnabledToolsKeys, aggregatePartsToolsWeight,
+  hasAnyMachine, getAvailablePartsTabs, getAvailableToolsTabs,
+  autoSwitchPartsTab, autoSwitchToolsTab,
+  validateTableConsistency, validateAllTables, fixAllConsistency,
+  syncSidebarFromMaterials, setSidebarVal, checkSidebarConsistency,
+  compute, calcAgencyFee, animateNum,
+  generateNextSeq, generateChildSeq,
+  DEFAULTS, state, fmt
+} from './calculation.js';
 
 // --- 健康检查 ---
 import {
@@ -26,7 +39,6 @@ import {
 
 // 全局数据引用（保持与现有代码兼容）
 Object.assign(window, Data);
-window.FormulaEngine = FormulaEngine;
 window.openRowEditModal = openRowEditModal;
 window.closeRowEditModal = closeRowEditModal;
 window.EditableTable = EditableTable;
@@ -79,5 +91,39 @@ window._highlightErrorRow = _highlightErrorRow;
 window.showDataHealthReport = showDataHealthReport;
 window.showToast = showToast;
 window._tableConfigs = _tableConfigs;
+
+// 业务逻辑
+window.FormulaEngine = FormulaEngine;
+window.MAT_LIB = MAT_LIB;
+window.MAT_IMPORT_LOG = MAT_IMPORT_LOG;
+window.generateNextSeq = generateNextSeq;
+window.generateChildSeq = generateChildSeq;
+window.getInputs = getInputs;
+window.isSubtotalRow = isSubtotalRow;
+window.isDirectChild = isDirectChild;
+window.aggregateMatTable = aggregateMatTable;
+window.aggregatePartsTools = aggregatePartsTools;
+window.aggregateSimple = aggregateSimple;
+window.aggregateMatTableValve = aggregateMatTableValve;
+window.getEnabledPartsKeys = getEnabledPartsKeys;
+window.getEnabledToolsKeys = getEnabledToolsKeys;
+window.aggregatePartsToolsWeight = aggregatePartsToolsWeight;
+window.hasAnyMachine = hasAnyMachine;
+window.getAvailablePartsTabs = getAvailablePartsTabs;
+window.getAvailableToolsTabs = getAvailableToolsTabs;
+window.autoSwitchPartsTab = autoSwitchPartsTab;
+window.autoSwitchToolsTab = autoSwitchToolsTab;
+window.validateTableConsistency = validateTableConsistency;
+window.validateAllTables = validateAllTables;
+window.fixAllConsistency = fixAllConsistency;
+window.syncSidebarFromMaterials = syncSidebarFromMaterials;
+window.setSidebarVal = setSidebarVal;
+window.checkSidebarConsistency = checkSidebarConsistency;
+window.compute = compute;
+window.calcAgencyFee = calcAgencyFee;
+window.animateNum = animateNum;
+window.DEFAULTS = DEFAULTS;
+window.state = state;
+window.fmt = fmt;
 
 console.log('Hydro Bid System 模块化入口已加载');
