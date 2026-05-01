@@ -4,6 +4,7 @@
 // Import DATA/PRICE_CACHE from data.js (needed for DATA_BACKUP IIFE at module eval time;
 // esbuild renames module-scoped vars, so free-variable references to 'DATA' won't resolve.)
 import { DATA, PRICE_CACHE } from './data.js';
+import { CUSTOM_FORMULAS } from './calculation.js';
 
 // ============ 数据备份 (用于重置) ============
 const DATA_BACKUP = {};
