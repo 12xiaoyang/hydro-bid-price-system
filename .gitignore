@@ -26,7 +26,8 @@ node_modules/
 
 # Claude memory
 c--Users-Yang-Desktop---------------Pro-files/
+.claude/
+.clawhub/
 
 # Test config
-package.json
 package-lock.json
