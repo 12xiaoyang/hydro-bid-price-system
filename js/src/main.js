@@ -14,6 +14,16 @@ import {
 } from './persistence.js';
 import { SNAPSHOT_MAX, takeProjectSnapshot, undoProjectSnapshot, redoProjectSnapshot } from './state.js';
 
+// --- 健康检查 ---
+import {
+  escapeRegExp, evaluateFormulaSafe, _rowContext,
+  autoFixMissingSeqs, autoFixUsageRates, autoFixSequences,
+  autoFixNegativeValues, autoFixDuplicateSeqs, autoFixEmptyRows, autoFixBuyMismatch,
+  generateDataHealthReport, TABLE_LABELS,
+  _navigateErrorByIdx, _navigateToError, _highlightErrorRow, showDataHealthReport,
+  showToast, _tableConfigs
+} from './health.js';
+
 // 全局数据引用（保持与现有代码兼容）
 Object.assign(window, Data);
 window.FormulaEngine = FormulaEngine;
@@ -49,5 +59,25 @@ window.SNAPSHOT_MAX = SNAPSHOT_MAX;
 window.takeProjectSnapshot = takeProjectSnapshot;
 window.undoProjectSnapshot = undoProjectSnapshot;
 window.redoProjectSnapshot = redoProjectSnapshot;
+
+// 健康检查
+window.escapeRegExp = escapeRegExp;
+window.evaluateFormulaSafe = evaluateFormulaSafe;
+window._rowContext = _rowContext;
+window.autoFixMissingSeqs = autoFixMissingSeqs;
+window.autoFixUsageRates = autoFixUsageRates;
+window.autoFixSequences = autoFixSequences;
+window.autoFixNegativeValues = autoFixNegativeValues;
+window.autoFixDuplicateSeqs = autoFixDuplicateSeqs;
+window.autoFixEmptyRows = autoFixEmptyRows;
+window.autoFixBuyMismatch = autoFixBuyMismatch;
+window.generateDataHealthReport = generateDataHealthReport;
+window.TABLE_LABELS = TABLE_LABELS;
+window._navigateErrorByIdx = _navigateErrorByIdx;
+window._navigateToError = _navigateToError;
+window._highlightErrorRow = _highlightErrorRow;
+window.showDataHealthReport = showDataHealthReport;
+window.showToast = showToast;
+window._tableConfigs = _tableConfigs;
 
 console.log('Hydro Bid System 模块化入口已加载');

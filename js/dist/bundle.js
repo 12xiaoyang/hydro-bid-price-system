@@ -3228,7 +3228,7 @@
   }
   var STORAGE_KEY = "hydro_bid_data_v2";
   var PROJECT_EXPORT_VERSION = "2.1.0-stable";
-  var PROJECT_DATA_KEYS = ["water", "gen", "valve", "valve_door", "water_parts", "gen_parts", "valve_parts", "water_tools", "gen_tools", "valve_tools", "automation", "monitoring", "liaison"];
+  var PROJECT_DATA_KEYS2 = ["water", "gen", "valve", "valve_door", "water_parts", "gen_parts", "valve_parts", "water_tools", "gen_tools", "valve_tools", "automation", "monitoring", "liaison"];
   function stableClone(obj) {
     try {
       if (typeof structuredClone === "function") return structuredClone(obj);
@@ -3238,19 +3238,19 @@
   }
   function getProjectDataTables() {
     const out = {};
-    PROJECT_DATA_KEYS.forEach((k) => {
+    PROJECT_DATA_KEYS2.forEach((k) => {
       if (DATA2[k]) out[k] = stableClone(DATA2[k]);
     });
     return out;
   }
   function captureProjectState() {
-    return { app: "hydro-bid-price-analysis-system", version: PROJECT_EXPORT_VERSION, exportedAt: (/* @__PURE__ */ new Date()).toISOString(), data: getProjectDataTables(), _sidebar: captureSidebarState(), _customFormulas: stableClone(CUSTOM_FORMULAS || {}), _state: { hasWater: state.hasWater, hasGen: state.hasGen, hasValve: state.hasValve, scenarios: stableClone(state.scenarios || []), currentMatTab: state.currentMatTab, currentPartsTab: state.currentPartsTab, currentToolsTab: state.currentToolsTab }, _matLib: typeof MAT_LIB !== "undefined" ? stableClone(MAT_LIB) : [], _importLog: typeof MAT_IMPORT_LOG !== "undefined" ? stableClone(MAT_IMPORT_LOG) : [] };
+    return { app: "hydro-bid-price-analysis-system", version: PROJECT_EXPORT_VERSION, exportedAt: (/* @__PURE__ */ new Date()).toISOString(), data: getProjectDataTables(), _sidebar: captureSidebarState2(), _customFormulas: stableClone(CUSTOM_FORMULAS || {}), _state: { hasWater: state.hasWater, hasGen: state.hasGen, hasValve: state.hasValve, scenarios: stableClone(state.scenarios || []), currentMatTab: state.currentMatTab, currentPartsTab: state.currentPartsTab, currentToolsTab: state.currentToolsTab }, _matLib: typeof MAT_LIB !== "undefined" ? stableClone(MAT_LIB) : [], _importLog: typeof MAT_IMPORT_LOG !== "undefined" ? stableClone(MAT_IMPORT_LOG) : [] };
   }
   function normalizeImportedProject(input) {
     const raw = input && typeof input === "object" ? input : {};
     const data = raw.data && typeof raw.data === "object" ? raw.data : raw;
     const out = { app: raw.app || "hydro-bid-price-analysis-system", version: raw.version || "legacy", data: {}, _sidebar: raw._sidebar || data._sidebar || null, _state: raw._state || data._state || {}, _matLib: raw._matLib || data._matLib || [], _importLog: raw._importLog || data._importLog || [] };
-    PROJECT_DATA_KEYS.forEach((k) => {
+    PROJECT_DATA_KEYS2.forEach((k) => {
       if (Array.isArray(data[k])) out.data[k] = data[k];
     });
     if (!Array.isArray(out._state.scenarios) && Array.isArray(data.scenarios)) out._state.scenarios = data.scenarios;
@@ -3260,7 +3260,7 @@
     const pkg = normalizeImportedProject(projectPackage);
     const _isRestoringSnapshot2 = true;
     try {
-      PROJECT_DATA_KEYS.forEach((k) => {
+      PROJECT_DATA_KEYS2.forEach((k) => {
         if (pkg.data && Array.isArray(pkg.data[k])) DATA2[k] = stableClone(pkg.data[k]);
       });
       if (pkg._matLib && typeof MAT_LIB !== "undefined" && Array.isArray(pkg._matLib)) {
@@ -3299,7 +3299,7 @@
         syncToggles();
       }
       PRICE_CACHE2.clear();
-      PROJECT_DATA_KEYS.forEach((k) => {
+      PROJECT_DATA_KEYS2.forEach((k) => {
         if (DATA2[k]) FormulaEngine.recalcTable(k);
       });
       if (typeof _sidebarOverrides !== "undefined") _sidebarOverrides.clear();
@@ -3415,7 +3415,7 @@
       console.error(e);
     }
   }
-  function captureSidebarState() {
+  function captureSidebarState2() {
     const el = (id) => document.getElementById(id);
     return {
       projectName: (el("projectName") || {}).value || "",
@@ -3478,7 +3478,7 @@
         takeProjectSnapshot("\u5BFC\u5165\u9879\u76EE");
         const pkg = importProjectJSON(e.target.result);
         restoreProjectState(pkg, { silent: true });
-        const rowCount = PROJECT_DATA_KEYS.reduce((sum, k) => sum + (Array.isArray(DATA2[k]) ? DATA2[k].length : 0), 0);
+        const rowCount = PROJECT_DATA_KEYS2.reduce((sum, k) => sum + (Array.isArray(DATA2[k]) ? DATA2[k].length : 0), 0);
         const report = generateDataHealthReport();
         if (!report.passed) showToast("\u5BFC\u5165\u6210\u529F\uFF0C\u4F46\u4F53\u68C0\u53D1\u73B0 " + report.summary.errorCount + " \u9519\u8BEF / " + report.summary.warningCount + " \u8B66\u544A");
         else showToast("\u6210\u529F\u5BFC\u5165\u5B8C\u6574\u9879\u76EE\uFF0C\u5171 " + rowCount + " \u6761\u6570\u636E");
@@ -3547,6 +3547,451 @@
     return true;
   }
 
+  // js/src/health.js
+  function escapeRegExp(s) {
+    return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  function evaluateFormulaSafe2(expr, row) {
+    const source = String(expr || "").trim();
+    if (!source) return null;
+    const blocked = [
+      /\bwindow\b/i,
+      /\bdocument\b/i,
+      /\bglobalThis\b/i,
+      /\blocalStorage\b/i,
+      /\bsessionStorage\b/i,
+      /\bfetch\b/i,
+      /\beval\b/i,
+      /\bFunction\b/i,
+      /\bconstructor\b/i,
+      /\bprototype\b/i,
+      /=>/,
+      /;/,
+      /`/
+    ];
+    if (blocked.some((r) => r.test(source))) throw new Error("\u516C\u5F0F\u5305\u542B\u4E0D\u5B89\u5168\u5185\u5BB9");
+    let resolved = source;
+    if (row && typeof row === "object") {
+      Object.keys(row).sort((a, b) => b.length - a.length).forEach((k) => {
+        const re = new RegExp("\\b" + escapeRegExp(k) + "\\b", "gi");
+        if (!re.test(resolved)) return;
+        const v = parseFloat(row[k]);
+        if (!isNaN(v)) {
+          resolved = resolved.replace(new RegExp("\\b" + escapeRegExp(k) + "\\b", "gi"), String(v));
+        } else {
+          resolved = resolved.replace(new RegExp("\\b" + escapeRegExp(k) + "\\b", "gi"), "0");
+        }
+      });
+    }
+    if (!/^[\d\s+\-*/().,%<>=!&|?:]+$/.test(resolved)) {
+      throw new Error("\u516C\u5F0F\u53EA\u80FD\u5305\u542B\u6570\u5B57\u3001\u6BD4\u8F83\u7B26\u548C\u57FA\u7840\u8FD0\u7B97\u7B26\uFF08\u672A\u8BC6\u522B\u53D8\u91CF: " + (resolved.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || []).join(", ") + "\uFF09");
+    }
+    const result = new Function('"use strict"; return (' + resolved + ");")();
+    if (typeof result === "number" && isFinite(result)) return Math.round(result * 1e4) / 1e4;
+    if (typeof result === "boolean") return result ? 1 : 0;
+    throw new Error("\u516C\u5F0F\u7ED3\u679C\u65E0\u6548");
+  }
+  function _rowContext(row) {
+    if (!row) return "";
+    const parts = [];
+    if (row.seq !== null && row.seq !== void 0 && String(row.seq).trim()) parts.push("\u5E8F\u53F7" + String(row.seq).trim());
+    if (row.name && String(row.name).trim()) parts.push(String(row.name).trim().substring(0, 20));
+    if (row.spec && String(row.spec).trim()) parts.push(String(row.spec).trim().substring(0, 15));
+    if (row.material && String(row.material).trim()) parts.push(String(row.material).trim().substring(0, 15));
+    if (row.model && String(row.model).trim()) parts.push(String(row.model).trim().substring(0, 15));
+    return parts.join(" \xB7 ");
+  }
+  function autoFixMissingSeqs() {
+    const fixed = { tables: 0, rows: 0 };
+    const ALL_TABLES = PROJECT_DATA_KEYS;
+    ALL_TABLES.forEach((k) => {
+      if (!Array.isArray(DATA[k]) || DATA[k].length === 0) return;
+      DATA[k].forEach((row, idx) => {
+        const hasName = row.name && String(row.name).trim() !== "";
+        const hasSeq = row.seq !== null && row.seq !== void 0 && String(row.seq).trim() !== "";
+        if (hasName && !hasSeq) {
+          row.seq = "A" + (idx + 1);
+          fixed.rows++;
+        }
+      });
+      if (fixed.rows > 0) {
+        fixed.tables++;
+        persistData();
+      }
+    });
+    return fixed;
+  }
+  function autoFixUsageRates() {
+    const fixed = { tables: 0, rows: 0 };
+    const ALL_TABLES = PROJECT_DATA_KEYS;
+    ALL_TABLES.forEach((k) => {
+      if (!Array.isArray(DATA[k]) || DATA[k].length === 0) return;
+      let tableFixed = false;
+      DATA[k].forEach((row) => {
+        if (row.usage !== null && row.usage !== void 0 && row.usage !== "") {
+          const u = parseFloat(row.usage);
+          if (isNaN(u)) return;
+          if (u < 0) {
+            row.usage = 0;
+            fixed.rows++;
+            tableFixed = true;
+          } else if (u > 1 && u % 1 !== 0) {
+            row.usage = Math.round(u);
+            fixed.rows++;
+            tableFixed = true;
+          }
+        }
+      });
+      if (tableFixed) {
+        fixed.tables++;
+        persistData();
+      }
+    });
+    return fixed;
+  }
+  function autoFixSequences2(dataKey) {
+    if (!["water", "gen", "valve", "valve_door"].includes(dataKey)) return { tables: 0, rows: 0 };
+    const items = DATA[dataKey];
+    if (!Array.isArray(items) || items.length === 0) return { tables: 0, rows: 0 };
+    const isNumericSeq = (s) => /^\d+(\.\d+)*$/.test(s);
+    let fixed = 0;
+    const parentSeqs = [];
+    const allSeqs = items.map((r) => r.seq).filter((s) => s && isNumericSeq(String(s)));
+    allSeqs.forEach((seq) => {
+      if (parentSeqs.includes(seq)) return;
+      const hasChild = allSeqs.some((other) => other !== seq && String(other).startsWith(String(seq) + "."));
+      if (hasChild) parentSeqs.push(seq);
+    });
+    const rootHasChild = items.some((r) => /^\d+$/.test(String(r.seq || "")));
+    if (rootHasChild && !parentSeqs.includes("\u4E00")) parentSeqs.push("\u4E00");
+    parentSeqs.sort((a, b) => {
+      const da = a === "\u4E00" ? 0 : String(a).split(".").length;
+      const db = b === "\u4E00" ? 0 : String(b).split(".").length;
+      return db - da;
+    });
+    parentSeqs.forEach((parentSeq) => {
+      const children = items.filter((r) => {
+        const cs = String(r.seq || "");
+        return cs && isNumericSeq(cs) && isDirectChild(parentSeq, cs);
+      });
+      children.sort((a, b) => {
+        const segA = parseInt(String(a.seq).split(".").pop(), 10);
+        const segB = parseInt(String(b.seq).split(".").pop(), 10);
+        return (isNaN(segA) ? 0 : segA) - (isNaN(segB) ? 0 : segB);
+      });
+      children.forEach((child, idx) => {
+        const newSeq = parentSeq === "\u4E00" ? String(idx + 1) : parentSeq + "." + (idx + 1);
+        const oldSeq = String(child.seq);
+        if (newSeq === oldSeq) return;
+        child.seq = newSeq;
+        fixed++;
+        items.forEach((r) => {
+          const rs = String(r.seq || "");
+          if (rs === oldSeq) return;
+          if (rs.startsWith(oldSeq + ".")) {
+            r.seq = newSeq + rs.substring(oldSeq.length);
+          }
+        });
+      });
+    });
+    return { tables: fixed > 0 ? 1 : 0, rows: fixed };
+  }
+  function autoFixNegativeValues() {
+    const fixed = { tables: 0, rows: 0 };
+    const ALL_TABLES = PROJECT_DATA_KEYS;
+    ALL_TABLES.forEach((k) => {
+      if (!Array.isArray(DATA[k]) || DATA[k].length === 0) return;
+      let tableFixed = false;
+      DATA[k].forEach((row) => {
+        ["weight", "amount"].forEach((fk) => {
+          if (row[fk] !== null && row[fk] !== void 0 && parseFloat(row[fk]) < 0) {
+            row[fk] = Math.abs(parseFloat(row[fk]));
+            fixed.rows++;
+            tableFixed = true;
+          }
+        });
+      });
+      if (tableFixed) {
+        fixed.tables++;
+        persistData();
+      }
+    });
+    return fixed;
+  }
+  function autoFixDuplicateSeqs() {
+    const fixed = { tables: 0, rows: 0 };
+    const fixableKeys = ["water", "gen", "valve", "valve_door", "water_parts", "gen_parts", "valve_parts", "water_tools", "gen_tools", "valve_tools"];
+    fixableKeys.forEach((k) => {
+      if (!Array.isArray(DATA[k]) || DATA[k].length === 0) return;
+      const seen = {};
+      let tableFixed = false;
+      DATA[k].forEach((row, idx) => {
+        if (!row.seq && row.seq !== 0) return;
+        const s = String(row.seq).trim();
+        if (!s) return;
+        if (seen[s] !== void 0) {
+          let suffix = 2;
+          let newSeq = s + "." + suffix;
+          while (seen[newSeq] !== void 0) {
+            suffix++;
+            newSeq = s + "." + suffix;
+          }
+          row.seq = newSeq;
+          seen[newSeq] = idx;
+          fixed.rows++;
+          tableFixed = true;
+        } else {
+          seen[s] = idx;
+        }
+      });
+      if (tableFixed) {
+        fixed.tables++;
+        persistData();
+      }
+    });
+    return fixed;
+  }
+  function autoFixEmptyRows() {
+    const fixed = { tables: 0, rows: 0 };
+    const ALL_TABLES = PROJECT_DATA_KEYS;
+    ALL_TABLES.forEach((k) => {
+      if (!Array.isArray(DATA[k]) || DATA[k].length === 0) return;
+      const before = DATA[k].length;
+      DATA[k] = DATA[k].filter((row) => {
+        if (!row || typeof row !== "object") return false;
+        const hasName = row.name && String(row.name).trim() !== "";
+        const hasSeq = row.seq !== null && row.seq !== void 0 && String(row.seq).trim() !== "";
+        const hasAnyData = Object.values(row).some((v) => v !== null && v !== void 0 && String(v).trim() !== "" && String(v) !== "0");
+        return hasName || hasSeq || hasAnyData;
+      });
+      const removed = before - DATA[k].length;
+      if (removed > 0) {
+        fixed.rows += removed;
+        fixed.tables++;
+        persistData();
+      }
+    });
+    return fixed;
+  }
+  function autoFixBuyMismatch() {
+    const fixed = { tables: 0, rows: 0 };
+    const BOM_KEYS = ["water", "gen", "valve", "valve_door"];
+    BOM_KEYS.forEach((k) => {
+      if (!Array.isArray(DATA[k]) || DATA[k].length === 0) return;
+      let tableFixed = false;
+      DATA[k].forEach((row) => {
+        if (row.is_buy === false) {
+          const uv = parseFloat(row.usage);
+          if (!isNaN(uv) && uv > 1 && uv % 1 === 0) {
+            row.is_buy = true;
+            fixed.rows++;
+            tableFixed = true;
+          }
+        }
+      });
+      if (tableFixed) {
+        fixed.tables++;
+        persistData();
+      }
+    });
+    return fixed;
+  }
+  function generateDataHealthReport2() {
+    const issues = [];
+    const fn = (row, k) => " \u2192 [" + _rowContext(row) + "]";
+    const add = (level, code, message, suggestion, tableKey, rowIdx, ctx) => issues.push({ level, code, message: message + (ctx || ""), suggestion: suggestion || "", tableKey: tableKey || "", rowIdx: rowIdx !== void 0 ? rowIdx : -1 });
+    const sidebar = captureSidebarState();
+    if (!sidebar.projectName) add("warning", "PROJECT_NAME_EMPTY", "\u9879\u76EE\u540D\u79F0\u4E3A\u7A7A", "\u5EFA\u8BAE\u8865\u5145\u9879\u76EE\u540D\u79F0\uFF0C\u4FBF\u4E8E\u5BFC\u51FA\u548C\u5F52\u6863");
+    if ((parseFloat(sidebar.unitCount) || 0) <= 0) add("error", "UNIT_COUNT_INVALID", "\u673A\u7EC4\u53F0\u6570\u5FC5\u987B\u5927\u4E8E 0", "\u8BF7\u5728\u5DE6\u4FA7\u9879\u76EE\u4FE1\u606F\u4E2D\u586B\u5199\u6709\u6548\u53F0\u6570");
+    const BOM_KEYS = ["water", "gen", "valve", "valve_door"];
+    const PARTS_KEYS = ["water_parts", "gen_parts", "valve_parts"];
+    const TOOLS_KEYS = ["water_tools", "gen_tools", "valve_tools"];
+    const ALL_TABLES = PROJECT_DATA_KEYS;
+    ALL_TABLES.forEach((k) => {
+      if (!Array.isArray(DATA[k])) {
+        add("error", "TABLE_INVALID", k + " \u4E0D\u662F\u6709\u6548\u6570\u7EC4", "\u8BF7\u91CD\u65B0\u5BFC\u5165\u6216\u6062\u590D\u9ED8\u8BA4\u6570\u636E", k, -1);
+        return;
+      }
+      if (DATA[k].length === 0) return;
+      DATA[k].forEach((row, idx) => {
+        if (!row || typeof row !== "object") {
+          add("error", "ROW_INVALID", k + " \u7B2C " + (idx + 1) + " \u884C\u4E0D\u662F\u5BF9\u8C61", "", k, idx);
+          return;
+        }
+        const ctx = fn(row, k);
+        const hasName = row.name && String(row.name).trim() !== "";
+        const hasSeq = row.seq !== null && row.seq !== void 0 && String(row.seq).trim() !== "";
+        if (BOM_KEYS.includes(k) || PARTS_KEYS.includes(k) || TOOLS_KEYS.includes(k)) {
+          if (!hasName && !hasSeq) {
+            const hasAnyData = Object.values(row).some((v) => v !== null && v !== void 0 && String(v).trim() !== "" && String(v) !== "0");
+            if (hasAnyData) add("error", "MISSING_BOTH", k + " \u7B2C " + (idx + 1) + " \u884C\u7F3A\u5C11\u5E8F\u53F7\u548C\u540D\u79F0" + ctx, "\u8BF7\u8865\u5145\u5E8F\u53F7\u6216\u540D\u79F0\uFF0C\u6216\u5220\u9664\u7A7A\u884C", k, idx);
+          } else if (!hasName) {
+            add("error", "MISSING_NAME", k + " \u7B2C " + (idx + 1) + " \u884C\u7F3A\u5C11\u540D\u79F0" + ctx, "\u8BF7\u8865\u5145\u540D\u79F0", k, idx);
+          } else if (!hasSeq) {
+            add("warning", "MISSING_SEQ", k + " \u7B2C " + (idx + 1) + " \u884C\u7F3A\u5C11\u5E8F\u53F7" + ctx, "\u5EFA\u8BAE\u8865\u5145\u5E8F\u53F7", k, idx);
+          }
+        }
+        if (["automation", "monitoring"].includes(k)) {
+          const hasFunc = row.function && String(row.function).trim() !== "";
+          if (!hasName && !hasFunc) {
+            const hasAnyData = Object.values(row).some((v) => v !== null && v !== void 0 && String(v).trim() !== "" && String(v) !== "0");
+            if (hasAnyData) add("error", "MISSING_NAME_FUNC", k + " \u7B2C " + (idx + 1) + " \u884C\u7F3A\u5C11\u540D\u79F0\u548C\u529F\u80FD" + ctx, "", k, idx);
+          }
+        }
+        if (row && "amount" in row && row.amount !== null && row.amount !== "" && isNaN(parseFloat(row.amount))) add("error", "AMOUNT_INVALID", k + " \u7B2C " + (idx + 1) + " \u884C\u91D1\u989D\u4E0D\u662F\u6570\u5B57" + ctx, "\u8BF7\u4FEE\u6B63\u4E3A\u6709\u6548\u6570\u5B57", k, idx);
+        if (row && "total" in row && row.total !== null && row.total !== "" && isNaN(parseFloat(row.total))) add("error", "TOTAL_INVALID", k + " \u7B2C " + (idx + 1) + " \u884C\u5408\u8BA1\u4E0D\u662F\u6570\u5B57" + ctx, "\u8BF7\u4FEE\u6B63\u4E3A\u6709\u6548\u6570\u5B57", k, idx);
+        if (row && "weight" in row && parseFloat(row.weight) < 0) add("warning", "WEIGHT_NEGATIVE", k + " \u7B2C " + (idx + 1) + " \u884C\u91CD\u91CF\u4E3A\u8D1F\u6570" + ctx, "\u8BF7\u4FEE\u6B63", k, idx);
+        if (row && "amount" in row && parseFloat(row.amount) < 0) add("warning", "AMOUNT_NEGATIVE", k + " \u7B2C " + (idx + 1) + " \u884C\u91D1\u989D\u4E3A\u8D1F\u6570" + ctx, "\u8BF7\u4FEE\u6B63", k, idx);
+        if (row && "qty" in row && row.qty !== null && row.qty !== void 0 && row.qty !== "") {
+          const q = parseFloat(row.qty);
+          if (isNaN(q) && isNaN(Date.parse(row.qty))) add("warning", "QTY_INVALID", k + " \u7B2C " + (idx + 1) + " \u884C\u6570\u91CF\u4E0D\u662F\u6709\u6548\u6570\u5B57" + ctx, "\u5EFA\u8BAE\u53EA\u586B\u6570\u5B57", k, idx);
+        }
+        if (BOM_KEYS.includes(k) && row && "is_buy" in row && row.is_buy !== null && row.is_buy !== void 0 && row.is_buy !== "") {
+          const uv = parseFloat(row.usage);
+          if (!isNaN(uv) && uv > 1 && uv % 1 === 0 && row.is_buy === false) add("warning", "BUY_USAGE_MISMATCH", k + " \u7B2C " + (idx + 1) + " \u884C\u6570\u91CF\u4E3A" + uv + "\uFF08\u5916\u8D2D\u7C7B\uFF09\uFF0C\u4F46\u6807\u8BB0\u4E3A\u81EA\u5236" + ctx, "\u5EFA\u8BAE\u5C06\u7C7B\u522B\u6539\u4E3A\u5916\u8D2D", k, idx);
+        }
+        if (hasSeq) {
+          const dupIdx = DATA[k].findIndex((r, i) => i !== idx && r && String(r.seq || "").trim() === String(row.seq).trim());
+          if (dupIdx >= 0 && dupIdx < idx) add("warning", "DUPLICATE_SEQ", k + " \u5E8F\u53F7 " + String(row.seq).trim() + " \u5728\u7B2C " + (dupIdx + 1) + " \u884C\u548C\u7B2C " + (idx + 1) + " \u884C\u91CD\u590D" + ctx, "\u5E8F\u53F7\u5E94\u552F\u4E00", k, idx);
+        }
+      });
+    });
+    BOM_KEYS.forEach((k) => {
+      if (typeof validateTableConsistency === "function") {
+        try {
+          validateTableConsistency(k).forEach((x) => add("warning", "SUBTOTAL_INCONSISTENT", k + " \u6C47\u603B\u884C " + (x.seq || x.idx) + " \u4E0E\u5B50\u9879\u5408\u8BA1\u4E0D\u4E00\u81F4\uFF08\u9884\u671F\u91CD\u91CF " + x.expectedWeight + " \u5B9E\u9645 " + x.actualWeight + "\uFF09", '\u53EF\u70B9\u51FB"\u4FEE\u590D\u6C47\u603B"\u4FEE\u590D', k, x.idx));
+        } catch (e) {
+        }
+      }
+    });
+    if (!state.scenarios || !Array.isArray(state.scenarios)) add("warning", "SCENARIOS_INVALID", "\u65B9\u6848\u6570\u636E\u4E0D\u662F\u6570\u7EC4", "\u7CFB\u7EDF\u4F1A\u5728\u4E0B\u6B21\u4FDD\u5B58\u65B9\u6848\u65F6\u4FEE\u590D");
+    const errorCount = issues.filter((x) => x.level === "error").length;
+    const warningCount = issues.filter((x) => x.level === "warning").length;
+    return { passed: errorCount === 0, summary: { errorCount, warningCount, totalCount: issues.length }, issues, checkedAt: (/* @__PURE__ */ new Date()).toISOString() };
+  }
+  var TABLE_LABELS = { water: "\u6C34\u8F6E\u673A\u6750\u6599", gen: "\u53D1\u7535\u673A\u6750\u6599", valve: "\u8FDB\u6C34\u9600\u6750\u6599", valve_door: "\u9600\u95E8(\u95E8)\u6750\u6599", water_parts: "\u6C34\u8F6E\u673A\u5907\u4EF6", gen_parts: "\u53D1\u7535\u673A\u5907\u4EF6", valve_parts: "\u8FDB\u6C34\u9600\u5907\u4EF6", water_tools: "\u6C34\u8F6E\u673A\u5DE5\u5177", gen_tools: "\u53D1\u7535\u673A\u5DE5\u5177", valve_tools: "\u8FDB\u6C34\u9600\u5DE5\u5177", automation: "\u81EA\u52A8\u5316", monitoring: "\u5728\u7EBF\u76D1\u6D4B", liaison: "\u8BBE\u8054\u4F1A" };
+  function _navigateErrorByIdx(idx) {
+    const issues = window.__healthIssues;
+    if (issues && issues[idx]) _navigateToError(issues[idx]);
+  }
+  function _navigateToError(issue) {
+    if (!issue.tableKey || issue.rowIdx < 0) return;
+    const k = issue.tableKey;
+    if (["water", "gen", "valve", "valve_door"].includes(k)) {
+      state.currentMatTab = k;
+      renderMaterials();
+    } else if (["water_parts", "gen_parts", "valve_parts"].includes(k)) {
+      state.currentPartsTab = k;
+      renderParts();
+    } else if (["water_tools", "gen_tools", "valve_tools"].includes(k)) {
+      state.currentToolsTab = k;
+      renderTools();
+    } else if (["automation", "monitoring", "liaison"].includes(k)) {
+      renderAll();
+    }
+    const overlay = document.getElementById("healthOverlay");
+    if (overlay) overlay.remove();
+    setTimeout(() => _highlightErrorRow(k, issue.rowIdx), 200);
+  }
+  function _highlightErrorRow(tableKey, rowIdx) {
+    let tableEl = null;
+    if (["water", "gen", "valve", "valve_door"].includes(tableKey)) {
+      tableEl = document.getElementById("matTable");
+    } else if (["water_parts", "gen_parts", "valve_parts"].includes(tableKey)) {
+      tableEl = document.getElementById("partsTable");
+    } else if (["water_tools", "gen_tools", "valve_tools"].includes(tableKey)) {
+      tableEl = document.getElementById("toolsTable");
+    } else if (tableKey === "automation") {
+      tableEl = document.getElementById("automationTable");
+    } else if (tableKey === "monitoring") {
+      tableEl = document.getElementById("monitoringTable");
+    } else if (tableKey === "liaison") {
+      tableEl = document.getElementById("liaisonTable");
+    }
+    if (!tableEl) return;
+    const rows = tableEl.querySelectorAll("tbody tr");
+    let targetRow = rows[rowIdx];
+    if (!targetRow) {
+      targetRow = tableEl.querySelector('tr[data-row="' + rowIdx + '"]');
+    }
+    if (targetRow) {
+      targetRow.scrollIntoView({ behavior: "smooth", block: "center" });
+      targetRow.style.transition = "background 0.3s";
+      targetRow.style.background = "var(--accent-light, #fff3cd)";
+      targetRow.style.boxShadow = "0 0 12px var(--accent, #f0a030)";
+      setTimeout(() => {
+        targetRow.style.background = "";
+        targetRow.style.boxShadow = "";
+      }, 3e3);
+    }
+  }
+  function showDataHealthReport2(report) {
+    const r = report || generateDataHealthReport2();
+    const existing = document.getElementById("healthOverlay");
+    if (existing) existing.remove();
+    const overlay = document.createElement("div");
+    overlay.id = "healthOverlay";
+    overlay.className = "health-overlay";
+    overlay.onclick = function(e) {
+      if (e.target === overlay) overlay.remove();
+    };
+    window.__healthIssues = r.issues;
+    const byTable = {};
+    r.issues.forEach((iss, idx) => {
+      iss._idx = idx;
+      const tk = iss.tableKey || "\u5168\u5C40";
+      if (!byTable[tk]) byTable[tk] = [];
+      byTable[tk].push(iss);
+    });
+    let groupsHtml = "";
+    Object.keys(byTable).forEach((tk) => {
+      const issues = byTable[tk];
+      const label = TABLE_LABELS[tk] || tk;
+      const errCount = issues.filter((x) => x.level === "error").length;
+      const warnCount = issues.filter((x) => x.level === "warning").length;
+      let badge = "";
+      if (errCount > 0) badge += '<span class="health-badge error">' + errCount + " \u9519\u8BEF</span>";
+      if (warnCount > 0) badge += '<span class="health-badge warning">' + warnCount + " \u8B66\u544A</span>";
+      let rowsHtml = "";
+      issues.forEach((iss) => {
+        const icon = iss.level === "error" ? "\u274C" : "\u26A0\uFE0F";
+        const cls = iss.level === "error" ? "health-row-error" : "health-row-warning";
+        const clickable = iss.tableKey && iss.rowIdx >= 0 ? "health-row-clickable" : "";
+        const rowInfo = iss.rowIdx >= 0 ? "\u7B2C" + (iss.rowIdx + 1) + "\u884C" : "";
+        rowsHtml += '<div class="health-issue-row ' + cls + " " + clickable + '"' + (clickable ? ' onclick="_navigateErrorByIdx(' + iss._idx + ')"' : "") + '><span class="health-issue-icon">' + icon + '</span><span class="health-issue-msg">' + rowInfo + " " + escHtml(iss.message) + "</span>" + (iss.suggestion ? '<span class="health-issue-tip">' + escHtml(iss.suggestion) + "</span>" : "") + (clickable ? '<span class="health-issue-nav">\u5B9A\u4F4D \u2192</span>' : "") + "</div>";
+      });
+      groupsHtml += '<div class="health-group"><div class="health-group-header"><span class="health-group-title">' + escHtml(label) + "</span>" + badge + '</div><div class="health-group-rows">' + rowsHtml + "</div></div>";
+    });
+    const passedIcon = r.passed ? "\u2705" : "\u26A0\uFE0F";
+    const passedText = r.passed ? "\u6570\u636E\u4F53\u68C0\u901A\u8FC7" : "\u6570\u636E\u4F53\u68C0\u672A\u901A\u8FC7";
+    const passedClass = r.passed ? "health-pass" : "health-fail";
+    const fixableSeq = r.issues.filter((x) => x.code === "MISSING_SEQ").length;
+    const fixableNeg = r.issues.filter((x) => x.code === "WEIGHT_NEGATIVE" || x.code === "AMOUNT_NEGATIVE").length;
+    const fixableDup = r.issues.filter((x) => x.code === "DUPLICATE_SEQ").length;
+    const fixableEmpty = r.issues.filter((x) => x.code === "MISSING_BOTH").length;
+    const fixableBuyMismatch = r.issues.filter((x) => x.code === "BUY_USAGE_MISMATCH").length;
+    const fixableTotal = fixableSeq + fixableNeg + fixableDup + fixableEmpty + fixableBuyMismatch + r.issues.filter((x) => x.code === "SUBTOTAL_INCONSISTENT").length;
+    let fixBtns = "";
+    if (fixableEmpty > 0) fixBtns += `<button class="btn btn-sm" onclick="autoFixEmptyRows(); document.getElementById('healthOverlay').remove(); setTimeout(function(){ showDataHealthReport(); },400);">\u6E05\u9664\u7A7A\u884C (` + fixableEmpty + ")</button>";
+    if (fixableSeq > 0) fixBtns += `<button class="btn btn-sm" onclick="autoFixMissingSeqs(); document.getElementById('healthOverlay').remove(); setTimeout(function(){ showDataHealthReport(); },400);">\u8865\u5168\u5E8F\u53F7 (` + fixableSeq + ")</button>";
+    if (fixableNeg > 0) fixBtns += `<button class="btn btn-sm" onclick="autoFixNegativeValues(); document.getElementById('healthOverlay').remove(); setTimeout(function(){ showDataHealthReport(); },400);">\u4FEE\u6B63\u8D1F\u6570 (` + fixableNeg + ")</button>";
+    if (fixableDup > 0) fixBtns += `<button class="btn btn-sm" onclick="autoFixDuplicateSeqs(); document.getElementById('healthOverlay').remove(); setTimeout(function(){ showDataHealthReport(); },400);">\u53BB\u91CD\u5E8F\u53F7 (` + fixableDup + ")</button>";
+    if (fixableBuyMismatch > 0) fixBtns += `<button class="btn btn-sm" onclick="autoFixBuyMismatch(); document.getElementById('healthOverlay').remove(); setTimeout(function(){ showDataHealthReport(); },400);">\u4FEE\u6B63\u7C7B\u522B (` + fixableBuyMismatch + ")</button>";
+    const hasFixable = fixableTotal > 0;
+    overlay.innerHTML = `<div class="health-modal"><div class="health-header"><span class="health-title">\u{1F50D} \u5FEB\u901F\u67E5\u9519</span><button class="health-close" onclick="document.getElementById('healthOverlay').remove()">\u2715</button></div><div class="health-summary ` + passedClass + '"><span class="health-summary-icon">' + passedIcon + '</span><span class="health-summary-text">' + passedText + '</span><span class="health-summary-stats">\u9519\u8BEF ' + r.summary.errorCount + " \xB7 \u8B66\u544A " + r.summary.warningCount + " \xB7 \u5171 " + r.summary.totalCount + ' \u9879</span><span class="health-summary-time">' + new Date(r.checkedAt).toLocaleString("zh-CN") + '</span></div><div class="health-body">' + (r.issues.length === 0 ? '<div class="health-empty">\u{1F389} \u672A\u53D1\u73B0\u4EFB\u4F55\u6570\u636E\u95EE\u9898</div>' : groupsHtml) + '</div><div class="health-footer"><span class="health-hint">\u{1F4A1} \u70B9\u51FB\u300C\u5B9A\u4F4D \u2192\u300D\u8DF3\u8F6C\u5230\u95EE\u9898\u884C\uFF0C\u70B9\u51FB\u4E0B\u65B9\u6309\u94AE\u6279\u91CF\u4FEE\u590D</span><span style="display:flex;gap:6px;flex-wrap:wrap;">' + fixBtns + `</span><button class="btn" onclick="document.getElementById('healthOverlay').remove()">\u5173\u95ED</button>` + (hasFixable ? `<button class="btn primary" onclick="autoFixEmptyRows(); autoFixMissingSeqs(); autoFixUsageRates(); autoFixNegativeValues(); autoFixDuplicateSeqs(); autoFixBuyMismatch(); fixAllConsistency(); document.getElementById('healthOverlay').remove(); setTimeout(function(){ showDataHealthReport(); },500);">\u{1F527} \u5168\u90E8\u4FEE\u590D</button>` : "") + "</div></div>";
+    document.body.appendChild(overlay);
+  }
+  function showToast2(msg) {
+    const existing = document.querySelector(".toast");
+    if (existing) existing.remove();
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 1600);
+  }
+  var _tableConfigs2 = {};
+
   // js/src/main.js
   Object.assign(window, data_exports);
   window.FormulaEngine = FormulaEngine2;
@@ -3560,7 +4005,7 @@
   window.resetDataTable = resetDataTable;
   window.STORAGE_KEY = STORAGE_KEY;
   window.PROJECT_EXPORT_VERSION = PROJECT_EXPORT_VERSION;
-  window.PROJECT_DATA_KEYS = PROJECT_DATA_KEYS;
+  window.PROJECT_DATA_KEYS = PROJECT_DATA_KEYS2;
   window.captureProjectState = captureProjectState;
   window.normalizeImportedProject = normalizeImportedProject;
   window.restoreProjectState = restoreProjectState;
@@ -3570,7 +4015,7 @@
   window.exportProjectFile = exportProjectFile;
   window.persistData = persistData2;
   window.saveHTML = saveHTML;
-  window.captureSidebarState = captureSidebarState;
+  window.captureSidebarState = captureSidebarState2;
   window.restoreSidebarState = restoreSidebarState;
   window.importFullData = importFullData;
   window.loadPersistedData = loadPersistedData;
@@ -3578,5 +4023,23 @@
   window.takeProjectSnapshot = takeProjectSnapshot2;
   window.undoProjectSnapshot = undoProjectSnapshot;
   window.redoProjectSnapshot = redoProjectSnapshot;
+  window.escapeRegExp = escapeRegExp;
+  window.evaluateFormulaSafe = evaluateFormulaSafe2;
+  window._rowContext = _rowContext;
+  window.autoFixMissingSeqs = autoFixMissingSeqs;
+  window.autoFixUsageRates = autoFixUsageRates;
+  window.autoFixSequences = autoFixSequences2;
+  window.autoFixNegativeValues = autoFixNegativeValues;
+  window.autoFixDuplicateSeqs = autoFixDuplicateSeqs;
+  window.autoFixEmptyRows = autoFixEmptyRows;
+  window.autoFixBuyMismatch = autoFixBuyMismatch;
+  window.generateDataHealthReport = generateDataHealthReport2;
+  window.TABLE_LABELS = TABLE_LABELS;
+  window._navigateErrorByIdx = _navigateErrorByIdx;
+  window._navigateToError = _navigateToError;
+  window._highlightErrorRow = _highlightErrorRow;
+  window.showDataHealthReport = showDataHealthReport2;
+  window.showToast = showToast2;
+  window._tableConfigs = _tableConfigs2;
   console.log("Hydro Bid System \u6A21\u5757\u5316\u5165\u53E3\u5DF2\u52A0\u8F7D");
 })();
