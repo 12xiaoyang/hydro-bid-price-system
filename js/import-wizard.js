@@ -1212,6 +1212,9 @@ const ImportWizard = {
         console.error('❌ 行数不匹配! DATA=' + DATA[targetTable].length + ' newRows=' + newRows.length);
       }
 
+      // 智能序号重排：修复跳号、首行不是 .1、父级序号断层
+      autoFixSequences(targetTable);
+
       // Recalculate formulas
       FormulaEngine.recalcTable(targetTable);
 
