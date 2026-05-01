@@ -3275,6 +3275,16 @@
     } catch (e) {
     }
   }
+  function persistMatLib2() {
+    try {
+      localStorage.setItem("hydro_mat_lib", JSON.stringify(MAT_LIB2));
+    } catch (e) {
+    }
+    try {
+      localStorage.setItem("hydro_import_log", JSON.stringify(MAT_IMPORT_LOG2));
+    } catch (e) {
+    }
+  }
   initMatLib();
   var DEFAULT_FORMULAS2 = {
     mat_amount_self: {
@@ -4621,6 +4631,2096 @@
   }
   var _tableConfigs2 = {};
 
+  // js/src/rendering/overview.js
+  function renderOverview(r) {
+    const i = r.inputs;
+    const kTotalEl = document.getElementById("kTotal");
+    if (kTotalEl) {
+      kTotalEl.innerHTML = fmt2(r.totalBid, 0) + '<span class="unit">\u4E07\u5143</span>';
+      kTotalEl.classList.remove("kpi-animate");
+      void kTotalEl.offsetWidth;
+      kTotalEl.classList.add("kpi-animate");
+    }
+    document.getElementById("kTotalSub").textContent = `\u542B ${i.unitCount} \u53F0\u673A\u7EC4 \xB7 \u4E3B\u673A/\u5907\u4EF6/\u5DE5\u5177/\u8FD0\u8F93/\u670D\u52A1`;
+    document.getElementById("kUnit").textContent = i.unitCount > 0 ? fmt2(r.totalBid / i.unitCount, 0) : "\u2014";
+    document.getElementById("kFixed").textContent = fmt2(r.totalFixed, 0);
+    const absorbPct = r.absorbPct * 100;
+    const absorbEl = document.getElementById("kAbsorb");
+    absorbEl.innerHTML = fmt2(absorbPct, 1) + '<span class="unit">%</span>';
+    const kpiEl = document.getElementById("kAbsorbKpi");
+    kpiEl.className = "mini-kpi " + (absorbPct > 45 ? "kpi-danger" : absorbPct > 30 ? "kpi-warn" : "kpi-good");
+    document.getElementById("kAbsorbSub").textContent = `\u6D88\u5316 ${fmt2(r.absorb, 0)} \u4E07`;
+    document.getElementById("kAgency").textContent = fmt2(r.agencyFee.fee, 2);
+    const badge = document.getElementById("marginBadge");
+    if (badge) {
+      const margin = r.absorbPct * 100;
+      if (margin > 45) {
+        badge.textContent = "\u26A0 \u6D88\u5316\u7387\u504F\u9AD8";
+        badge.style.cssText = "display:inline-block;background:var(--red-light);color:var(--red);padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;";
+      } else if (margin > 28) {
+        badge.textContent = "\u2713 \u62A5\u4EF7\u5408\u7406";
+        badge.style.cssText = "display:inline-block;background:var(--green-light);color:var(--green);padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;";
+      } else {
+        badge.textContent = "\u2191 \u6709\u63D0\u4EF7\u7A7A\u95F4";
+        badge.style.cssText = "display:inline-block;background:var(--blue-light);color:var(--blue);padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;";
+      }
+    }
+    const palette = ["var(--blue)", "var(--accent)", "var(--red)", "var(--green)", "var(--teal)", "var(--purple)", "var(--amber)", "var(--indigo)", "var(--teal)"];
+    const body = document.getElementById("billBody");
+    body.innerHTML = r.items.map((it, idx) => {
+      const pct = r.totalBid > 0 ? it.total / r.totalBid * 100 : 0;
+      const color = palette[idx % palette.length];
+      return `<tr>
+      <td style="font-weight:500;">${it.name}</td>
+      <td class="num">${fmt2(it.self, 2)}</td>
+      <td class="num">${fmt2(it.buy, 2)}</td>
+      <td class="num">${fmt2(it.selfM, 2)}</td>
+      <td class="num">${fmt2(it.buyM, 2)}</td>
+      <td class="num">${fmt2(it.cost, 2)}</td>
+      <td class="num">${it.qty}</td>
+      <td class="num">${fmt2(it.unit, 2)}</td>
+      <td class="num" style="font-weight:600;">${fmt2(it.total, 2)}</td>
+      <td>
+        <div class="bill-bar">
+          <div class="bill-bar-track"><div class="bill-bar-fill" style="width:${pct}%;background:${color};"></div></div>
+          <span style="font-size:11px;color:var(--text-muted);min-width:34px;text-align:right;">${fmt2(pct, 1)}%</span>
+        </div>
+      </td>
+    </tr>`;
+    }).join("");
+    const sum = (k) => r.items.reduce((s, it) => s + it[k], 0);
+    document.getElementById("tSelf").textContent = fmt2(sum("self"), 2);
+    document.getElementById("tBuy").textContent = fmt2(sum("buy"), 2);
+    document.getElementById("tSelfM").textContent = fmt2(sum("selfM"), 2);
+    document.getElementById("tBuyM").textContent = fmt2(sum("buyM"), 2);
+    document.getElementById("tCost").textContent = fmt2(sum("cost"), 2);
+    document.getElementById("tTotal").textContent = fmt2(r.totalBid, 2);
+  }
+
+  // js/src/rendering/machines.js
+  function renderMachines(r) {
+    const machines = [
+      { key: "water", label: "\u6C34\u8F6E\u673A", model: "HLB200-LJ-203", en: "Hydro Turbine", d: r.water },
+      { key: "gen", label: "\u53D1\u7535\u673A", model: "SF40-16/4700", en: "Generator", d: r.gen },
+      { key: "valve", label: "\u8FDB\u6C34\u9600\u95E8", model: "PDF120-WY-280", en: "Inlet Valve", d: r.valve }
+    ];
+    document.getElementById("machinesGrid").innerHTML = machines.map((m) => {
+      if (!m.d.has) return `<div class="machine" data-t="${m.key}" style="opacity:0.4;"><div class="machine-name">${m.label}</div><div style="font-size:12px;color:var(--text-dim);text-align:center;padding:30px 0;">\u672C\u9879\u76EE\u4E0D\u542B\u6B64\u8BBE\u5907</div></div>`;
+      const total = m.d.self + m.d.buy;
+      const selfPct = total > 0 ? m.d.self / total * 100 : 0;
+      return `<div class="machine" data-t="${m.key}">
+      <div class="machine-name">${m.label}</div>
+      <div class="machine-model">${m.model}</div>
+      <div class="machine-row"><span>\u91CD\u91CF</span><span class="v">${fmt2(m.d.weight, 1)} T <button class="btn" style="font-size:10px;padding:1px 5px;margin-left:4px;" onclick="jumpToMaterial('${m.key}')" title="\u67E5\u770B\u6750\u6599\u660E\u7EC6">\u2192</button></span></div>
+      <div class="machine-row"><span>\u6750\u6599\u4EF7</span><span class="v">${fmt2(m.d.mat, 2)} \u4E07</span></div>
+      <div class="machine-row"><span>\u5916\u8D2D\u4EF6</span><span class="v">${fmt2(m.d.buy, 2)} \u4E07</span></div>
+      <div class="machine-row"><span>\u81EA\u5236\u90E8\u5206</span><span class="v">${fmt2(m.d.self, 2)} \u4E07</span></div>
+      <div class="machine-row"><span>\u6750\u6599\u5428\u4EF7</span><span class="v">${fmt2(m.d.matT, 2)} \u4E07/T</span></div>
+      <div class="machine-row highlight"><span>\u62DF\u62A5\u5355\u4EF7</span><span class="v">${fmt2(m.d.unit, 2)} \u4E07</span></div>
+      <div class="machine-row"><span>\u6295\u6807\u5428\u4EF7</span><span class="v">${fmt2(m.d.bidT, 2)} \u4E07/T</span></div>
+      <div style="margin-top:10px;">
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--text-muted);">
+          <span>\u81EA\u5236 ${fmt2(selfPct, 1)}%</span><span>\u5916\u8D2D ${fmt2(100 - selfPct, 1)}%</span>
+        </div>
+        <div class="stacked">
+          <div style="background:var(--blue);width:${selfPct}%;"></div>
+          <div style="background:var(--amber);width:${100 - selfPct}%;"></div>
+        </div>
+      </div>
+    </div>`;
+    }).join("");
+  }
+
+  // js/src/rendering/charts.js
+  var chTonPrice;
+  var chTonPrice2;
+  var chComposition;
+  var chSelfBuy;
+  var chCostStack;
+  function renderCharts(r) {
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)";
+    const textColor = isDark ? "#9090b8" : "#5a5a7a";
+    const panelColor = isDark ? "#1a1a2e" : "#ffffff";
+    Chart.defaults.color = textColor;
+    Chart.defaults.borderColor = gridColor;
+    const tonData = {
+      labels: ["\u6C34\u8F6E\u673A", "\u53D1\u7535\u673A", "\u9600\u95E8"],
+      datasets: [
+        { label: "\u6750\u6599\u5428\u4EF7", data: [r.water.matT, r.gen.matT, r.valve.matT], backgroundColor: isDark ? "rgba(85,128,240,0.8)" : "rgba(59,111,212,0.8)", borderRadius: 5 },
+        { label: "\u6295\u6807\u5428\u4EF7", data: [r.water.bidT, r.gen.bidT, r.valve.bidT], backgroundColor: isDark ? "rgba(240,160,80,0.8)" : "rgba(200,135,61,0.8)", borderRadius: 5 }
+      ]
+    };
+    const tonOpts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 10, boxHeight: 10, padding: 14, font: { size: 11 }, color: textColor } },
+        tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.y.toFixed(2)} \u4E07/T` } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: textColor } },
+        y: { beginAtZero: true, grid: { color: gridColor }, ticks: { callback: (v) => v + " \u4E07/T", font: { size: 11 }, color: textColor } }
+      }
+    };
+    if (chTonPrice) {
+      chTonPrice.data = tonData;
+      chTonPrice.options = tonOpts;
+      chTonPrice.update();
+    } else chTonPrice = new Chart(document.getElementById("chTonPrice"), { type: "bar", data: tonData, options: tonOpts });
+    if (document.getElementById("chTonPrice2")) {
+      if (chTonPrice2) {
+        chTonPrice2.data = tonData;
+        chTonPrice2.options = tonOpts;
+        chTonPrice2.update();
+      } else chTonPrice2 = new Chart(document.getElementById("chTonPrice2"), { type: "bar", data: tonData, options: tonOpts });
+    }
+    const compItems = r.items.filter((x) => x.total > 0.01);
+    const palette = ["#3b6fd4", "#e08820", "#e04060", "#1faa6b", "#00bfa5", "#7c6fdd", "#4255b0", "#f0a050", "#888"];
+    const compData = {
+      labels: compItems.map((x) => x.name),
+      datasets: [{
+        data: compItems.map((x) => x.total),
+        backgroundColor: compItems.map((_, i) => palette[i % palette.length]),
+        borderWidth: 3,
+        borderColor: panelColor,
+        hoverOffset: 8
+      }]
+    };
+    const compOpts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "62%",
+      plugins: {
+        legend: { position: "right", labels: { boxWidth: 10, boxHeight: 10, padding: 10, font: { size: 11 }, color: textColor } },
+        tooltip: {
+          callbacks: {
+            label: (c) => {
+              const tot = c.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = tot > 0 ? (c.parsed / tot * 100).toFixed(1) : "0";
+              return ` ${c.label}: ${c.parsed.toFixed(2)} \u4E07 (${pct}%)`;
+            }
+          }
+        }
+      }
+    };
+    if (chComposition) {
+      chComposition.data = compData;
+      chComposition.options = compOpts;
+      chComposition.update();
+    } else chComposition = new Chart(document.getElementById("chComposition"), { type: "doughnut", data: compData, options: compOpts });
+    if (document.getElementById("chSelfBuy")) {
+      const sbData = {
+        labels: ["\u6C34\u8F6E\u673A", "\u53D1\u7535\u673A", "\u9600\u95E8"],
+        datasets: [
+          { label: "\u81EA\u5236", data: [r.water.self, r.gen.self, r.valve.self], backgroundColor: isDark ? "rgba(85,128,240,0.8)" : "rgba(59,111,212,0.8)", borderRadius: 4 },
+          { label: "\u5916\u8D2D", data: [r.water.buy, r.gen.buy, r.valve.buy], backgroundColor: isDark ? "rgba(240,160,80,0.8)" : "rgba(200,135,61,0.8)", borderRadius: 4 }
+        ]
+      };
+      const sbOpts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 10, boxHeight: 10, padding: 14, font: { size: 11 }, color: textColor } },
+          tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.y.toFixed(2)} \u4E07` } }
+        },
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { color: textColor } },
+          y: { stacked: true, beginAtZero: true, grid: { color: gridColor }, ticks: { callback: (v) => v + " \u4E07", color: textColor } }
+        }
+      };
+      if (chSelfBuy) {
+        chSelfBuy.data = sbData;
+        chSelfBuy.options = sbOpts;
+        chSelfBuy.update();
+      } else chSelfBuy = new Chart(document.getElementById("chSelfBuy"), { type: "bar", data: sbData, options: sbOpts });
+    }
+    if (document.getElementById("chCostStack")) {
+      const csData = {
+        labels: r.items.map((x) => x.name),
+        datasets: [
+          { label: "\u81EA\u5236\u6210\u672C", data: r.items.map((x) => x.self), backgroundColor: isDark ? "rgba(85,128,240,0.85)" : "rgba(59,111,212,0.85)", borderRadius: 3 },
+          { label: "\u5916\u8D2D\u6210\u672C", data: r.items.map((x) => x.buy), backgroundColor: isDark ? "rgba(240,160,80,0.85)" : "rgba(200,135,61,0.85)", borderRadius: 3 },
+          { label: "\u81EA\u5236\u52A0\u4EF7", data: r.items.map((x) => x.selfM), backgroundColor: isDark ? "rgba(85,128,240,0.4)" : "rgba(59,111,212,0.4)", borderRadius: 3 },
+          { label: "\u5916\u8D2D\u52A0\u4EF7", data: r.items.map((x) => x.buyM), backgroundColor: isDark ? "rgba(240,160,80,0.4)" : "rgba(200,135,61,0.4)", borderRadius: 3 }
+        ]
+      };
+      const csOpts = {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 10, boxHeight: 10, padding: 14, font: { size: 11 }, color: textColor } },
+          tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.x.toFixed(2)} \u4E07` } }
+        },
+        scales: {
+          x: { stacked: true, beginAtZero: true, grid: { color: gridColor }, ticks: { callback: (v) => v + " \u4E07", color: textColor } },
+          y: { stacked: true, grid: { display: false }, ticks: { color: textColor } }
+        }
+      };
+      if (chCostStack) {
+        chCostStack.data = csData;
+        chCostStack.options = csOpts;
+        chCostStack.update();
+      } else chCostStack = new Chart(document.getElementById("chCostStack"), { type: "bar", data: csData, options: csOpts });
+    }
+  }
+
+  // js/src/rendering/transport.js
+  function renderTransport(r) {
+    const t = r.transport;
+    const i = r.inputs;
+    document.getElementById("tWeightTotal").textContent = fmt2(i.waterWeight + i.genWeight + i.valveWeight, 2) + " T";
+    document.getElementById("tFactor").textContent = fmt2(i.transportExtra, 2);
+    document.getElementById("tWeightAdj").textContent = fmt2(t.weightSingle, 2) + " T";
+    document.getElementById("tWeightWide").textContent = fmt2(t.wideWeight, 2) + " T";
+    document.getElementById("tWeightNorm").textContent = fmt2(t.normalWeight, 2) + " T";
+    document.getElementById("tDistance").textContent = fmt2(i.distance, 0) + " km";
+    document.getElementById("tPriceWide").textContent = fmt2(i.tonKmPriceWide, 2) + " \u5143";
+    document.getElementById("tPriceNorm").textContent = fmt2(i.tonKmPrice, 2) + " \u5143";
+    document.getElementById("tCostWide").textContent = fmt2(t.transportWide, 4);
+    document.getElementById("tCostNorm").textContent = fmt2(t.transportNormal, 4);
+    document.getElementById("tCostUnit").textContent = fmt2(t.transportUnit, 2) + " \u4E07";
+    document.getElementById("tQty").textContent = i.unitCount;
+    document.getElementById("tCostAll").textContent = fmt2(t.transportTotal, 2) + " \u4E07";
+  }
+
+  // js/src/rendering/agency.js
+  function renderAgency(r) {
+    const detail = r.agencyFee.detail;
+    document.getElementById("agencyInfo").innerHTML = `\u6295\u6807\u4EF7 <strong>${fmt2(r.totalBid, 2)} \u4E07\u5143</strong> \xB7 \u7D2F\u8FDB\u81F3\u7B2C <strong>${detail.length}</strong> \u6863 \xB7 \u5E94\u6536\u4EE3\u7406\u8D39 <strong>${fmt2(r.agencyFee.fee, 2)} \u4E07\u5143</strong>`;
+    const rows = DATA2.agency_tiers.map((t, i) => {
+      const matched = detail[i];
+      return `<tr class="${matched && matched.hit ? "hit" : ""}">
+      <td>${i + 1}</td>
+      <td>${t.desc}</td>
+      <td class="num">${matched ? fmt2(matched.length, 2) : "\u2014"}</td>
+      <td class="num">${fmt2(t.rate * 100, 4)}%</td>
+      <td class="num">${matched ? fmt2(matched.fee, 4) : "\u2014"}</td>
+      <td class="num">${matched ? fmt2(matched.cumulative, 4) : "\u2014"}</td>
+    </tr>`;
+    }).join("");
+    document.getElementById("agencyTableBody").innerHTML = rows;
+  }
+
+  // js/src/rendering/bid-analysis.js
+  var chBidLadder;
+  function renderBidAnalysis(r) {
+    if (!r || !r.totalBid) return;
+    const cost = r.totalFixed;
+    const bid = r.totalBid;
+    const margin = bid > 0 ? (bid - cost) / bid : 0;
+    const floor = cost * 1.05;
+    const suggestLow = cost * 1.25;
+    const suggestHigh = cost * 1.45;
+    const absorbPct = r.absorbPct * 100;
+    let winRate;
+    if (absorbPct < 15) winRate = 92;
+    else if (absorbPct < 25) winRate = 80 - (absorbPct - 15) * 1.5;
+    else if (absorbPct < 38) winRate = 65 - (absorbPct - 25) * 2.2;
+    else if (absorbPct < 52) winRate = 36 - (absorbPct - 38) * 1.8;
+    else winRate = Math.max(5, 11 - (absorbPct - 52) * 0.5);
+    winRate = Math.min(95, Math.max(5, winRate));
+    document.getElementById("baWinRate").textContent = winRate.toFixed(0) + "%";
+    document.getElementById("baFloor").textContent = fmt2(floor, 0) + " \u4E07";
+    document.getElementById("baSuggest").textContent = fmt2(suggestLow, 0) + " ~ " + fmt2(suggestHigh, 0) + " \u4E07";
+    const arc = document.getElementById("gaugeArc");
+    const gaugeText = document.getElementById("gaugeText");
+    if (arc) {
+      const total = 188;
+      const filled = total * (winRate / 100);
+      arc.setAttribute("stroke-dasharray", `${filled} ${total - filled}`);
+      gaugeText.textContent = winRate.toFixed(0) + "%";
+      gaugeText.setAttribute("fill", winRate > 60 ? "var(--green)" : winRate > 35 ? "var(--amber)" : "var(--red)");
+    }
+    const comment = document.getElementById("baWinComment");
+    if (comment) {
+      let txt = "";
+      if (winRate > 70) txt = `<span style="color:var(--green);font-weight:600;">\u62A5\u4EF7\u7ADE\u4E89\u529B\u5F3A \u2705</span><br>\u5F53\u524D\u62A5\u4EF7\u76F8\u5BF9\u8F83\u4F4E\uFF0C\u80DC\u7B97\u8F83\u5927\u3002\u53EF\u8003\u8651\u9002\u5F53\u4E0A\u6D6E <strong>${fmt2(suggestLow - bid, 0)}</strong> \u4E07\u5143\u4EE5\u63D0\u5347\u5229\u6DA6\u7A7A\u95F4\uFF0C\u540C\u65F6\u4E0D\u5F71\u54CD\u4E2D\u6807\u6982\u7387\u3002`;
+      else if (winRate > 45) txt = `<span style="color:var(--amber);font-weight:600;">\u62A5\u4EF7\u5904\u4E8E\u5408\u7406\u533A\u95F4 \u26A0\uFE0F</span><br>\u5F53\u524D\u80DC\u7387\u9002\u4E2D\u3002\u5EFA\u8BAE\u62A5\u4EF7\u5728 <strong>${fmt2(suggestLow, 0)}~${fmt2(suggestHigh, 0)}</strong> \u4E07\u5143\u4E4B\u95F4\uFF0C\u517C\u987E\u7ADE\u4E89\u529B\u4E0E\u5229\u6DA6\u3002`;
+      else txt = `<span style="color:var(--red);font-weight:600;">\u62A5\u4EF7\u504F\u9AD8\uFF0C\u80DC\u7387\u8F83\u4F4E \u274C</span><br>\u5F53\u524D\u6D88\u5316\u7387 <strong>${absorbPct.toFixed(1)}%</strong> \u8F83\u9AD8\uFF0C\u5EFA\u8BAE\u68C0\u67E5\u6210\u672C\u6784\u6210\uFF0C\u6216\u5C06\u62A5\u4EF7\u964D\u81F3 <strong>${fmt2(suggestLow, 0)}</strong> \u4E07\u4EE5\u5185\u4EE5\u63D0\u5347\u7ADE\u4E89\u529B\u3002`;
+      comment.innerHTML = txt;
+    }
+    const sensEl = document.getElementById("baSensitivity");
+    if (sensEl) {
+      const scenarios = [
+        { label: "\u62A5\u4EF7 -10%", val: bid * 0.9, color: "var(--red)" },
+        { label: "\u62A5\u4EF7 -5%", val: bid * 0.95, color: "var(--amber)" },
+        { label: "\u5F53\u524D\u62A5\u4EF7", val: bid, color: "var(--blue)", current: true },
+        { label: "\u62A5\u4EF7 +5%", val: bid * 1.05, color: "var(--green)" },
+        { label: "\u62A5\u4EF7 +10%", val: bid * 1.1, color: "var(--teal)" }
+      ];
+      sensEl.innerHTML = scenarios.map((s) => {
+        const profit = s.val - cost;
+        const pct = s.val > 0 ? profit / s.val * 100 : 0;
+        const barW = Math.max(0, Math.min(100, pct * 2));
+        return `<div class="sensitivity-row" style="${s.current ? "font-weight:600;" : ""}">
+        <span style="width:80px;font-size:11.5px;">${s.label}</span>
+        <div class="sensitivity-bar"><div class="sensitivity-fill" style="width:${barW}%;background:${s.color};"></div></div>
+        <span style="width:70px;text-align:right;font-size:11.5px;color:${s.color};font-family:monospace;">${fmt2(profit, 0)} \u4E07</span>
+        <span style="width:44px;text-align:right;font-size:11px;color:var(--text-dim);">${pct.toFixed(1)}%</span>
+      </div>`;
+      }).join("");
+    }
+    const stratEl = document.getElementById("baStrategy");
+    if (stratEl) {
+      const cards = [
+        { icon: "\u{1F534}", title: "\u4FDD\u5E95\u4EF7", val: fmt2(floor, 0) + " \u4E07", desc: "\u6210\u672C+5%\u7BA1\u7406\u8D39\uFF0C\u6700\u4F4E\u4E0D\u53EF\u4F4E\u4E8E\u6B64\u4EF7", color: "var(--red-light)", border: "var(--red)" },
+        { icon: "\u{1F7E1}", title: "\u7ADE\u4E89\u4EF7", val: fmt2(suggestLow, 0) + " \u4E07", desc: "\u6210\u672C\xD71.25\uFF0C\u517C\u987E\u7ADE\u4E89\u529B\u4E0E\u57FA\u672C\u5229\u6DA6", color: "var(--amber-light)", border: "var(--amber)" },
+        { icon: "\u{1F7E2}", title: "\u76EE\u6807\u4EF7", val: fmt2(suggestHigh, 0) + " \u4E07", desc: "\u6210\u672C\xD71.45\uFF0C\u7406\u60F3\u5229\u6DA6\u533A\u95F4\u4E0A\u9650", color: "var(--green-light)", border: "var(--green)" }
+      ];
+      stratEl.innerHTML = cards.map((c) => `
+      <div style="background:${c.color};border:1px solid ${c.border};border-radius:8px;padding:14px;text-align:center;">
+        <div style="font-size:22px;margin-bottom:4px;">${c.icon}</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.08em;">${c.title}</div>
+        <div style="font-size:20px;font-weight:700;font-family:monospace;color:var(--text);">${c.val}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">${c.desc}</div>
+      </div>`).join("");
+    }
+    const steps = 9;
+    const labels = [], profitData = [], winData = [];
+    for (let i = 0; i < steps; i++) {
+      const pct = -20 + i * 5;
+      const v = bid * (1 + pct / 100);
+      const p = v - cost;
+      const pPct = v > 0 ? p / v * 100 : 0;
+      let wr;
+      const absP = (v - cost) / v * 100;
+      if (absP < 15) wr = 92;
+      else if (absP < 25) wr = 80 - (absP - 15) * 1.5;
+      else if (absP < 38) wr = 65 - (absP - 25) * 2.2;
+      else if (absP < 52) wr = 36 - (absP - 38) * 1.8;
+      else wr = Math.max(5, 11 - (absP - 52) * 0.5);
+      wr = Math.min(95, Math.max(5, wr));
+      labels.push((pct >= 0 ? "+" : "") + pct + "%");
+      profitData.push(parseFloat(p.toFixed(1)));
+      winData.push(parseFloat(wr.toFixed(1)));
+    }
+    const ladderData = {
+      labels,
+      datasets: [
+        { label: "\u5229\u6DA6(\u4E07\u5143)", data: profitData, type: "bar", backgroundColor: profitData.map((v) => v > 0 ? "rgba(31,170,107,0.7)" : "rgba(224,64,96,0.7)"), borderRadius: 4, yAxisID: "y" },
+        { label: "\u9884\u4F30\u80DC\u7387(%)", data: winData, type: "line", borderColor: "var(--blue)", backgroundColor: "rgba(59,111,212,0.1)", tension: 0.4, yAxisID: "y2", pointBackgroundColor: "var(--blue)", pointRadius: 4 }
+      ]
+    };
+    const ctx = document.getElementById("chBidLadder");
+    if (ctx) {
+      if (chBidLadder) {
+        chBidLadder.data = ladderData;
+        chBidLadder.update();
+      } else chBidLadder = new Chart(ctx, {
+        data: ladderData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } },
+            tooltip: { callbacks: { label: (c) => c.dataset.label + ": " + c.parsed.y + (c.datasetIndex === 1 ? "%" : " \u4E07") } }
+          },
+          scales: {
+            x: { grid: { display: false } },
+            y: { beginAtZero: false, ticks: { callback: (v) => v + " \u4E07", font: { size: 11 } }, title: { display: true, text: "\u5229\u6DA6 (\u4E07\u5143)", font: { size: 11 } } },
+            y2: { position: "right", min: 0, max: 100, ticks: { callback: (v) => v + "%", font: { size: 11 } }, grid: { display: false }, title: { display: true, text: "\u80DC\u7387", font: { size: 11 } } }
+          }
+        }
+      });
+    }
+  }
+  function updateExportButtons() {
+    const exportBtn = document.getElementById("exportCsvBtn");
+    const printBtn = document.getElementById("printBtn");
+    const disabled = !hasAnyMachine();
+    if (exportBtn) exportBtn.disabled = disabled;
+    if (printBtn) printBtn.disabled = disabled;
+  }
+
+  // js/src/rendering/materials.js
+  function renderMaterials2() {
+    const which = state2.currentMatTab;
+    const search = (document.getElementById("matSearch").value || "").toLowerCase();
+    const filter = document.getElementById("matFilter").value;
+    const filterFn = (it) => {
+      if (filter === "self" && it.is_buy) return false;
+      if (filter === "buy" && !it.is_buy) return false;
+      if (search) {
+        const text = (it.name + " " + (it.material || "") + " " + (it.replacement || "") + " " + (it.remark || "")).toLowerCase();
+        if (!text.includes(search)) return false;
+      }
+      return true;
+    };
+    FormulaEngine2.recalcTable(which);
+    const config = {
+      tableId: "matTable",
+      dataKey: which,
+      columns: [
+        { key: "seq", label: "\u5E8F\u53F7" },
+        { key: "name", label: "\u90E8\u4EF6\u540D\u79F0" },
+        { key: "material", label: "\u6750\u6599", type: "material" },
+        { key: "replacement", label: "\u66FF\u4EE3\u6750\u6599", type: "material" },
+        { key: "weight", label: "\u91CD\u91CF(T)", align: "right", type: "weight", summary: true, summaryLabel: "\u603B\u91CD\u91CF" },
+        { key: "amount", label: "\u91D1\u989D(\u4E07)", align: "right", type: "money", formula: true, summary: true, summaryLabel: "\u91D1\u989D\u5408\u8BA1" },
+        { key: "usage", label: "\u5229\u7528\u7387/\u6570\u91CF", align: "right", type: "usageRate" },
+        { key: "is_buy", label: "\u7C7B\u522B", type: "bool" },
+        { key: "remark", label: "\u5907\u6CE8" }
+      ],
+      summaryId: "matSummary",
+      filterFn,
+      onChange: () => {
+      }
+    };
+    _tableConfigs2[config.tableId] = config;
+    EditableTable.render(config);
+    const summaryEl = document.getElementById("matSummary");
+    if (summaryEl && !document.getElementById("matResetBtn")) {
+      const btnWrap = document.createElement("span");
+      btnWrap.style.cssText = "display:inline-flex;gap:6px;align-items:center;";
+      const fixBtn = document.createElement("button");
+      fixBtn.className = "btn-fix";
+      fixBtn.textContent = "\u4FEE\u590D\u6C47\u603B";
+      fixBtn.title = "\u4E00\u952E\u91CD\u65B0\u8BA1\u7B97\u6240\u6709\u5C42\u7EA7\u6C47\u603B\u503C";
+      fixBtn.onclick = () => {
+        fixAllConsistency();
+      };
+      const btn = document.createElement("button");
+      btn.id = "matResetBtn";
+      btn.className = "btn-reset";
+      btn.textContent = "\u6062\u590D\u9ED8\u8BA4";
+      btn.onclick = () => {
+        if (confirm("\u786E\u5B9A\u6062\u590D\u6B64\u8868\u4E3A\u9ED8\u8BA4\u6570\u636E\uFF1F")) {
+          resetDataTable(which);
+          renderMaterials2();
+          window.renderAll();
+          showToast2("\u5DF2\u6062\u590D\u9ED8\u8BA4\u6570\u636E");
+        }
+      };
+      btnWrap.appendChild(fixBtn);
+      btnWrap.appendChild(btn);
+      summaryEl.parentElement.insertBefore(btnWrap, summaryEl);
+    }
+  }
+
+  // js/src/rendering/parts-tools.js
+  function renderParts2() {
+    autoSwitchPartsTab();
+    const key = state2.currentPartsTab;
+    const isValve = key === "valve_parts";
+    const partsTabsContainer = document.querySelector("#partsTabs");
+    const partsTabBtns = partsTabsContainer ? partsTabsContainer.querySelectorAll("button") : [];
+    partsTabBtns.forEach((btn) => {
+      const tabKey = btn.dataset.key;
+      const isEnabled = tabKey === "water_parts" && state2.hasWater || tabKey === "gen_parts" && state2.hasGen || tabKey === "valve_parts" && state2.hasValve;
+      btn.style.display = isEnabled ? "" : "none";
+      btn.classList.toggle("on", tabKey === key);
+    });
+    const availTabs = getAvailablePartsTabs();
+    if (!hasAnyMachine()) {
+      document.getElementById("partsTable").innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px 0;color:var(--text-dim);font-size:13px;">\u8BF7\u81F3\u5C11\u9009\u62E9\u4E00\u4E2A\u4E3B\u673A\u7C7B\u578B</td></tr>';
+      document.getElementById("partsSummary").innerHTML = "";
+      return;
+    }
+    FormulaEngine2.recalcTable(key);
+    const cols = [
+      { key: "seq", label: "\u5E8F\u53F7", width: "50px" },
+      { key: "name", label: "\u9879\u76EE" },
+      { key: "qty", label: "\u6570\u91CF", width: "70px", type: "qty", align: "right" },
+      { key: "unit", label: "\u5355\u4F4D", width: "60px" },
+      { key: "spec", label: "\u89C4\u683C" },
+      { key: "self", label: "\u81EA\u5236", width: "70px", align: "right", type: "money", summary: true, summaryLabel: "\u81EA\u5236\u5408\u8BA1" },
+      { key: "buy", label: "\u5916\u8D2D", width: "70px", align: "right", type: "money", summary: true, summaryLabel: "\u5916\u8D2D\u5408\u8BA1" }
+    ];
+    if (isValve) cols.push({ key: "total", label: "\u5408\u8BA1", width: "70px", align: "right", type: "money", formula: true, summary: true, summaryLabel: "\u603B\u5408\u8BA1" });
+    const config = {
+      tableId: "partsTable",
+      dataKey: key,
+      columns: cols,
+      summaryId: "partsSummary",
+      onChange: () => {
+      }
+    };
+    _tableConfigs2[config.tableId] = config;
+    EditableTable.render(config);
+  }
+  function renderTools2() {
+    autoSwitchToolsTab();
+    const key = state2.currentToolsTab;
+    const isValve = key === "valve_tools";
+    const toolsTabsContainer = document.querySelector("#toolsTabs");
+    const toolsTabBtns = toolsTabsContainer ? toolsTabsContainer.querySelectorAll("button") : [];
+    toolsTabBtns.forEach((btn) => {
+      const tabKey = btn.dataset.key;
+      const isEnabled = tabKey === "water_tools" && state2.hasWater || tabKey === "gen_tools" && state2.hasGen || tabKey === "valve_tools" && state2.hasValve;
+      btn.style.display = isEnabled ? "" : "none";
+      btn.classList.toggle("on", tabKey === key);
+    });
+    if (!hasAnyMachine()) {
+      document.getElementById("toolsTable").innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px 0;color:var(--text-dim);font-size:13px;">\u8BF7\u81F3\u5C11\u9009\u62E9\u4E00\u4E2A\u4E3B\u673A\u7C7B\u578B</td></tr>';
+      document.getElementById("toolsSummary").innerHTML = "";
+      return;
+    }
+    FormulaEngine2.recalcTable(key);
+    const cols = [
+      { key: "seq", label: "\u5E8F\u53F7", width: "50px" },
+      { key: "name", label: "\u540D\u79F0" },
+      { key: "qty", label: "\u6570\u91CF", width: "70px", type: "qty", align: "right" },
+      { key: "unit", label: "\u5355\u4F4D", width: "60px" },
+      { key: "weight", label: "\u91CD\u91CF", width: "80px", align: "right", type: "weight", summary: true, summaryLabel: "\u603B\u91CD\u91CF" },
+      { key: "self", label: "\u81EA\u5236", width: "70px", align: "right", type: "money", summary: true, summaryLabel: "\u81EA\u5236\u5408\u8BA1" },
+      { key: "buy", label: "\u5916\u8D2D", width: "70px", align: "right", type: "money", summary: true, summaryLabel: "\u5916\u8D2D\u5408\u8BA1" }
+    ];
+    if (isValve) cols.push({ key: "total", label: "\u5408\u8BA1", width: "70px", align: "right", type: "money", formula: true, summary: true, summaryLabel: "\u603B\u5408\u8BA1" });
+    const config = {
+      tableId: "toolsTable",
+      dataKey: key,
+      columns: cols,
+      summaryId: "toolsSummary",
+      onChange: () => {
+      }
+    };
+    _tableConfigs2[config.tableId] = config;
+    EditableTable.render(config);
+  }
+
+  // js/src/rendering/automation.js
+  var AUTO_GROUP_ORDER = ["\u6C34\u8F6E\u673A\u81EA\u52A8\u5316\u68C0\u6D4B", "\u53D1\u7535\u673A\u81EA\u52A8\u5316\u68C0\u6D4B", "\u9600\u95E8\u81EA\u52A8\u5316\u68C0\u6D4B", "\u5907\u4EF6\u81EA\u52A8\u5316\u68C0\u6D4B", "\u5DE5\u5177\u81EA\u52A8\u5316\u68C0\u6D4B", "\u8F85\u52A9\u8BBE\u5907\u81EA\u52A8\u5316\u68C0\u6D4B"];
+  var AUTO_GROUP_SEQ = ["\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"];
+  var AUTO_COLS = [
+    { key: "seq", label: "\u5E8F\u53F7", width: "74px" },
+    { key: "name", label: "\u540D\u79F0" },
+    { key: "model", label: "\u578B\u53F7\u89C4\u683C" },
+    { key: "qty", label: "\u6570\u91CF", width: "60px", align: "right", type: "int" },
+    { key: "unit_price", label: "\u5355\u4EF7(\u5143)", width: "80px", align: "right", type: "number" },
+    { key: "total", label: "\u5408\u4EF7(\u5143)", width: "80px", align: "right", type: "number", formula: true, summary: true, summaryLabel: "\u603B\u4EF7" },
+    { key: "usage", label: "\u4F7F\u7528\u4F4D\u7F6E" },
+    { key: "manufacturer", label: "\u5236\u9020\u5382" }
+  ];
+  function inferAutoGroup(row) {
+    if (row.auto_group) return row.auto_group;
+    const seqNum = parseInt(row.source_seq || row.seq, 10);
+    return !isNaN(seqNum) && seqNum <= 32 ? "\u6C34\u8F6E\u673A\u81EA\u52A8\u5316\u68C0\u6D4B" : "\u53D1\u7535\u673A\u81EA\u52A8\u5316\u68C0\u6D4B";
+  }
+  function inferAutoSubgroup(row, group) {
+    if (row.auto_subgroup) return row.auto_subgroup;
+    const s = [row.name, row.usage, row.model].filter(Boolean).join(" ");
+    const has = (...keys) => keys.some((k) => s.includes(k));
+    if (group === "\u6C34\u8F6E\u673A\u81EA\u52A8\u5316\u68C0\u6D4B") {
+      if (has("\u5BFC\u53F6", "\u526A\u65AD\u9500")) return "\u5BFC\u6C34\u673A\u6784";
+      if (has("\u63A5\u529B\u5668", "\u7A7A\u6C14\u56F4\u5E26")) return "\u63A5\u529B\u5668\u4E0E\u7A7A\u6C14\u56F4\u5E26";
+      if (has("\u8717\u58F3", "\u9876\u76D6", "\u5C3E\u6C34")) return "\u57CB\u5165\u96F6\u4EF6\u538B\u529B\u76D1\u6D4B";
+      if (has("\u5BC6\u5C01\u6C34", "\u4E3B\u8F74\u5BC6\u5C01", "\u5BFC\u8F74\u627F\u51B7\u5374", "\u6C34\u5BFC\u51B7\u5374")) return "\u4E3B\u8F74\u5BC6\u5C01\u4E0E\u6C34\u5BFC\u51B7\u5374";
+      if (has("\u6C34\u5BFC\u8F74\u627F", "\u6C34\u5BFC\u6CB9\u69FD", "\u6C34\u5BFC\u8F74\u74E6", "\u6E29\u5EA6", "\u6D4B\u6E29", "\u7AEF\u5B50\u7BB1", "\u6CB9\u6DF7\u6C34")) return "\u6C34\u5BFC\u8F74\u627F\u4E0E\u6D4B\u6E29";
+    } else if (group === "\u53D1\u7535\u673A\u81EA\u52A8\u5316\u68C0\u6D4B") {
+      if (has("\u4E0A\u5BFC", "\u4E0B\u5BFC", "\u63A8\u529B", "\u6CB9\u69FD", "\u6CB9\u6DF7\u6C34")) return "\u8F74\u627F\u6CB9\u69FD\u76D1\u6D4B";
+      if (has("\u51B7\u5374\u6C34", "\u7A7A\u51B7\u5668", "\u603B\u51B7\u5374")) return "\u51B7\u5374\u7CFB\u7EDF\u76D1\u6D4B";
+      if (has("\u8F74\u74E6\u6E29\u5EA6", "\u5B9A\u5B50\u6E29\u5EA6", "\u6E29\u5EA6\u62A5\u8B66", "\u6D4B\u6E29")) return "\u6D4B\u6E29\u7CFB\u7EDF";
+      if (has("\u9F7F\u76D8", "\u6D4B\u901F")) return "\u8F6C\u901F\u76D1\u6D4B";
+      if (has("\u706B\u707E", "\u706B\u8B66")) return "\u6D88\u9632\u62A5\u8B66";
+      if (has("\u5236\u52A8")) return "\u5236\u52A8\u7CFB\u7EDF";
+      if (has("\u7AEF\u5B50\u7BB1", "\u63A7\u5236\u67DC", "\u6D4B\u6E29\u5236\u52A8\u67DC")) return "\u7AEF\u5B50\u7BB1\u4E0E\u63A7\u5236\u67DC";
+    }
+    return "\u5176\u4ED6\u81EA\u52A8\u5316\u5143\u4EF6";
+  }
+  function ensureAutoTreeSeq() {
+    const clean = [];
+    (DATA2.automation || []).forEach((row) => {
+      if (String(row.seq || "").trim() === "\u5E8F\u53F7" || String(row.name || "").replace(/\s+/g, "") === "\u540D\u79F0") return;
+      if (row.source_seq === void 0 || row.source_seq === null || row.source_seq === "") row.source_seq = row.seq;
+      row.auto_group = inferAutoGroup(row);
+      row.auto_subgroup = inferAutoSubgroup(row, row.auto_group);
+      clean.push(row);
+    });
+    if (clean.length !== (DATA2.automation || []).length) DATA2.automation = clean;
+    AUTO_GROUP_ORDER.forEach((group, gi) => {
+      const subNames = [];
+      clean.filter((r) => r.auto_group === group).forEach((r) => {
+        if (!subNames.includes(r.auto_subgroup)) subNames.push(r.auto_subgroup);
+      });
+      subNames.forEach((sub, si) => {
+        clean.filter((r) => r.auto_group === group && r.auto_subgroup === sub).forEach((r, ri) => {
+          r.seq = ri + 1;
+        });
+      });
+    });
+  }
+  function renderAutoCell(row, col, realIdx, ci) {
+    const val = row[col.key];
+    const cls = ["editable-cell"];
+    if (col.align === "right") cls.push("num");
+    if (col.formula) cls.push("formula-cell");
+    let display = EditableTable.cellDisplay(val, col);
+    if (col.key === "seq") {
+      display = `<span class="auto-seq-main">${escHtml2(String(val ?? ""))}</span>`;
+    }
+    if (col.key === "total" && val != null && val !== "") {
+      display = `<span class="auto-total-val">${display}</span>`;
+    }
+    if (col.key === "unit_price" && val != null && val !== "") {
+      display = `<span class="auto-price-val">${display}</span>`;
+    }
+    const titleAttr = typeof val === "string" && val.length > 16 ? ` title="${val.replace(/"/g, "&quot;")}"` : "";
+    return `<td class="${cls.join(" ")}" data-col="${ci}" data-key="${col.key}" data-idx="${realIdx}" data-orig-idx="${realIdx}"${titleAttr}>${display}</td>`;
+  }
+  function renderAutoGroupedTable(rows, groupName, groupIdx) {
+    const groupSeq = AUTO_GROUP_SEQ[groupIdx] || String(groupIdx + 1);
+    if (!rows.length) {
+      return `<details class="auto-tree-group">
+      <summary>
+        <span class="auto-tree-seq">${groupSeq}</span>
+        <div class="auto-tree-title"><span class="auto-tree-name">${escHtml2(groupName)}</span></div>
+        <span class="auto-tree-count">0 \u9879</span>
+      </summary>
+      <div class="auto-tree-empty">\u6682\u65E0\u5339\u914D\u9879\u76EE</div>
+    </details>`;
+    }
+    const subNames = [];
+    rows.forEach(({ row }) => {
+      if (!subNames.includes(row.auto_subgroup)) subNames.push(row.auto_subgroup);
+    });
+    const colgroupHtml = `<colgroup>
+    <col class="atm-op">
+    ${AUTO_COLS.map((c) => {
+      const cls = {
+        seq: "atm-seq",
+        name: "atm-name",
+        model: "atm-model",
+        qty: "atm-qty",
+        unit_price: "atm-price",
+        total: "atm-total",
+        usage: "atm-usage",
+        manufacturer: "atm-mfr"
+      }[c.key] || "";
+      return `<col class="${cls}">`;
+    }).join("")}
+  </colgroup>`;
+    let body = "";
+    subNames.forEach((sub, si) => {
+      const subRows = rows.filter((x) => x.row.auto_subgroup === sub);
+      const subTotal = subRows.reduce((s, x) => s + (parseFloat(x.row.total) || 0), 0);
+      body += `<div class="auto-subgroup">
+      <div class="auto-subgroup-header">
+        <div class="auto-subgroup-title">${si + 1}. ${escHtml2(sub)}</div>
+        <div class="auto-subgroup-meta">
+          <span class="auto-subgroup-count">${subRows.length} \u9879</span>
+          <span class="auto-subgroup-subtotal">\xA5 ${fmt2(subTotal, 2)}</span>
+        </div>
+      </div>
+      <table class="auto-table-mini">
+        ${colgroupHtml}
+        <thead><tr>
+          <th></th>
+          ${AUTO_COLS.map((c) => `<th class="${c.align === "right" ? "num" : ""}" title="${escHtml2(c.label)}">${escHtml2(c.label)}</th>`).join("")}
+        </tr></thead>
+        <tbody>
+          ${subRows.map(({ row, idx }) => `<tr class="row-editable">
+            <td><button class="row-btn row-edit-btn" onclick="openRowEditModal('data',{dataKey:'automation',rowIdx:${idx},config:_tableConfigs.autoTable})" title="\u5F39\u7A97\u7F16\u8F91">\u270E</button></td>
+            ${AUTO_COLS.map((col, ci) => renderAutoCell(row, col, idx, ci)).join("")}
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+    });
+    const total = rows.reduce((sum, x) => sum + (parseFloat(x.row.total) || 0), 0);
+    return `<details class="auto-tree-group" open>
+    <summary>
+      <span class="auto-tree-seq">${groupSeq}</span>
+      <div class="auto-tree-title"><span class="auto-tree-name">${escHtml2(groupName)}</span></div>
+      <span class="auto-tree-count">${rows.length} \u9879</span>
+      <span class="auto-tree-total-badge">\u5408\u4EF7 ${fmt2(total, 2)} \u5143</span>
+    </summary>
+    ${body}
+  </details>`;
+  }
+  function renderAuto() {
+    const search = (document.getElementById("autoSearch").value || "").toLowerCase();
+    FormulaEngine2.recalcTable("automation");
+    FormulaEngine2.recalcTable("monitoring");
+    ensureAutoTreeSeq();
+    const autoConfig = {
+      tableId: "autoTable",
+      dataKey: "automation",
+      columns: AUTO_COLS,
+      summaryId: "autoSummary",
+      onChange: () => {
+      }
+    };
+    _tableConfigs2[autoConfig.tableId] = autoConfig;
+    const all = (DATA2.automation || []).map((row, idx) => ({ row, idx }));
+    const filtered = all.filter(({ row }) => {
+      if (!search) return true;
+      return [row.seq, row.name, row.model, row.usage, row.manufacturer, row.auto_group, row.auto_subgroup].filter(Boolean).join(" ").toLowerCase().includes(search);
+    });
+    const host = document.getElementById("autoTable");
+    if (host) {
+      const total = filtered.reduce((sum, x) => sum + (parseFloat(x.row.total) || 0), 0);
+      host.outerHTML = `<div id="autoTable" class="auto-tree">
+      <div class="auto-tree-toolbar">
+        <div class="info">\u6309\u7EC4\u5185\u987A\u5E8F\u7F16\u53F7\uFF081\u30012\u30013\u2026\uFF09\uFF0C\u539F\u59CB\u6765\u6E90\u884C\u53F7\u4FDD\u7559\u5728\u6570\u636E\u4E2D\u3002</div>
+        <div class="auto-tree-actions">
+          <button class="btn" onclick="document.querySelectorAll('#autoTable details.auto-tree-group').forEach(d=>d.open=true)">\u5168\u90E8\u5C55\u5F00</button>
+          <button class="btn" onclick="document.querySelectorAll('#autoTable details.auto-tree-group').forEach(d=>d.open=false)">\u5168\u90E8\u6536\u8D77</button>
+        </div>
+      </div>
+      ${AUTO_GROUP_ORDER.map((group, gi) => renderAutoGroupedTable(filtered.filter((x) => x.row.auto_group === group), group, gi)).join("")}
+    </div>`;
+      const summaryEl = document.getElementById("autoSummary");
+      if (summaryEl) summaryEl.innerHTML = `\u5171 ${DATA2.automation.length} \u9879 \xB7 \u5F53\u524D\u663E\u793A ${filtered.length} \u9879 \xB7 \u5408\u4EF7\uFF1A<strong style="color:var(--text);">${fmt2(total, 2)}</strong> \u5143 <span style="color:var(--text-dim);font-size:11px;">(\u2248 ${fmt2(total / YUAN_TO_WAN2, 4)} \u4E07)</span>`;
+      setTimeout(() => {
+        const newHost = document.getElementById("autoTable");
+        if (newHost) applyResizableTables();
+      }, 0);
+    }
+    const monConfig = {
+      tableId: "monitorTable",
+      dataKey: "monitoring",
+      columns: [
+        { key: "seq", label: "\u5E8F\u53F7", width: "50px" },
+        { key: "function", label: "\u529F\u80FD" },
+        { key: "name", label: "\u5143\u4EF6\u540D\u79F0" },
+        { key: "model", label: "\u578B\u53F7" },
+        { key: "qty", label: "\u6570\u91CF", width: "60px", align: "right", type: "qty" },
+        { key: "unit_price", label: "\u5355\u4EF7(\u5143)", width: "80px", align: "right", type: "number" },
+        { key: "total", label: "\u5408\u4EF7(\u5143)", width: "80px", align: "right", type: "number", formula: true, summary: true, summaryLabel: "\u603B\u4EF7" },
+        { key: "remark", label: "\u5907\u6CE8" }
+      ],
+      summaryId: "monitorSummary",
+      onChange: () => {
+      }
+    };
+    _tableConfigs2[monConfig.tableId] = monConfig;
+    EditableTable.render(monConfig);
+  }
+
+  // js/src/rendering/liaison.js
+  function renderLiaison() {
+    FormulaEngine2.recalcTable("liaison");
+    const config = {
+      tableId: "liaisonTable",
+      dataKey: "liaison",
+      columns: [
+        { key: "seq", label: "\u5E8F\u53F7", width: "50px" },
+        { key: "name", label: "\u9879\u76EE" },
+        { key: "location", label: "\u5730\u70B9" },
+        { key: "person_days", label: "\u4EBA\u5929\u6570", align: "right", type: "int" },
+        { key: "unit_price", label: "\u5355\u4EF7(\u5143/\u4EBA\u65E5)", align: "right", type: "number" },
+        { key: "total", label: "\u603B\u4EF7(\u5143)", align: "right", type: "number", formula: true, summary: true, summaryLabel: "\u603B\u4EF7" },
+        { key: "remark", label: "\u5907\u6CE8" }
+      ],
+      summaryId: "liaisonSummary",
+      onChange: () => {
+      }
+    };
+    _tableConfigs2[config.tableId] = config;
+    EditableTable.render(config);
+  }
+
+  // js/src/rendering/material-lib.js
+  function _nextMatLibId() {
+    const maxId = MAT_LIB2.reduce((max, m) => {
+      const num = parseInt((m.id || "MAT-0000").replace("MAT-", ""), 10);
+      return !isNaN(num) && num > max ? num : max;
+    }, 0);
+    return "MAT-" + String(maxId + 1).padStart(4, "0");
+  }
+  function renderMatLib2() {
+    const search = (document.getElementById("matLibSearch")?.value || "").toLowerCase();
+    const catFilter = document.getElementById("matLibCatFilter")?.value || "all";
+    let items = MAT_LIB2;
+    if (search) items = items.filter((m) => m.name.toLowerCase().includes(search) || (m.spec || "").toLowerCase().includes(search) || (m.remark || "").toLowerCase().includes(search));
+    if (catFilter !== "all") items = items.filter((m) => m.category === catFilter);
+    let html = `<thead><tr>
+    <th style="width:40px;"></th>
+    <th>\u6750\u6599ID</th><th>\u6750\u6599\u540D\u79F0</th><th>\u89C4\u683C</th><th>\u5206\u7C7B</th>
+    <th class="num">\u6807\u51C6\u4EF7\u683C(\u4E07/T)</th><th class="num">\u5229\u7528\u7387</th><th>\u5907\u6CE8</th>
+  </tr></thead><tbody>`;
+    if (items.length === 0) {
+      html += `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-dim);">\u6682\u65E0\u6750\u6599\u6570\u636E \xB7 \u70B9\u51FB"\u4E00\u952E\u5BFC\u5165\u6750\u6599"\u6216"\u65B0\u589E\u6750\u6599"\u5F00\u59CB</td></tr>`;
+    }
+    const shouldGroup = !search && catFilter === "all";
+    if (shouldGroup) {
+      const groups = {};
+      items.forEach((m) => {
+        const cat = m.category || "\u5176\u4ED6";
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(m);
+      });
+      const catOrder = ["\u677F\u6750\u7C7B", "\u578B\u6750\u7C7B", "\u94F8\u4EF6\u7C7B", "\u953B\u4EF6\u7C7B", "\u94DC\u6750", "\u7EDD\u7F18\u6750\u6599", "\u4E0D\u9508\u94A2\u6750", "\u7BA1\u6750", "\u6210\u54C1\u4EF6", "\u8F74\u627F/\u8F74\u5957", "\u5BC6\u5C01\u4EF6", "\u9600\u95E8\u7C7B", "\u5176\u4ED6"];
+      const sortedCats = [...catOrder.filter((c) => groups[c]), ...Object.keys(groups).filter((c) => !catOrder.includes(c))];
+      sortedCats.forEach((cat) => {
+        const catItems = groups[cat];
+        html += `<tr style="background:var(--accent-light);cursor:pointer;" onclick="toggleMatLibGroup('${cat.replace(/'/g, "\\'")}')" title="\u70B9\u51FB\u5C55\u5F00/\u6298\u53E0">
+        <td colspan="8" style="padding:5px 10px;font-weight:600;font-size:12px;color:var(--accent-dark);letter-spacing:0.05em;">
+          <span id="matLibGroupIcon_${cat.replace(/[^a-zA-Z0-9]/g, "_")}">\u25BC</span>
+          &nbsp;${cat}
+          <span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">${catItems.length} \u9879</span>
+        </td>
+      </tr>`;
+        catItems.forEach((m) => {
+          const realIdx = MAT_LIB2.indexOf(m);
+          html += `<tr class="matlib-group-row matlib-group-${cat.replace(/[^a-zA-Z0-9]/g, "_")}">
+          <td style="text-align:center;white-space:nowrap;">
+            <button class="row-btn row-edit-btn" onclick="openRowEditModal('matlib',{idx:${realIdx}})" title="\u5F39\u7A97\u7F16\u8F91">\u270E</button><button class="row-btn del" onclick="deleteMatLibItem(${realIdx})" title="\u5220\u9664">\xD7</button>
+          </td>
+          <td style="font-family:monospace;font-size:11px;">${m.id}</td>
+          <td class="editable-cell" data-col="1" data-idx="${realIdx}" data-lib="true">${m.name}</td>
+          <td class="editable-cell" data-col="2" data-idx="${realIdx}" data-lib="true">${m.spec || '<span style="color:var(--text-dim);">\u2014</span>'}</td>
+          <td class="editable-cell" data-col="3" data-idx="${realIdx}" data-lib="true">${m.category}</td>
+          <td class="editable-cell num" data-col="4" data-idx="${realIdx}" data-lib="true">${fmt2(m.price, 4)}</td>
+          <td class="editable-cell num" data-col="5" data-idx="${realIdx}" data-lib="true">${fmt2(m.usage_rate ?? 0.8, 2)}</td>
+          <td class="editable-cell" data-col="6" data-idx="${realIdx}" data-lib="true">${m.remark || '<span style="color:var(--text-dim);">\u2014</span>'}</td>
+        </tr>`;
+        });
+      });
+    } else {
+      items.forEach((m, idx) => {
+        const realIdx = MAT_LIB2.indexOf(m);
+        html += `<tr>
+        <td style="text-align:center;white-space:nowrap;">
+          <button class="row-btn row-edit-btn" onclick="openRowEditModal('matlib',{idx:${realIdx}})" title="\u5F39\u7A97\u7F16\u8F91">\u270E</button><button class="row-btn del" onclick="deleteMatLibItem(${realIdx})" title="\u5220\u9664">\xD7</button>
+        </td>
+        <td style="font-family:monospace;font-size:11px;">${m.id}</td>
+        <td class="editable-cell" data-col="1" data-idx="${realIdx}" data-lib="true">${m.name}</td>
+        <td class="editable-cell" data-col="2" data-idx="${realIdx}" data-lib="true">${m.spec || '<span style="color:var(--text-dim);">\u2014</span>'}</td>
+        <td class="editable-cell" data-col="3" data-idx="${realIdx}" data-lib="true">${m.category}</td>
+        <td class="editable-cell num" data-col="4" data-idx="${realIdx}" data-lib="true">${fmt2(m.price, 4)}</td>
+        <td class="editable-cell num" data-col="5" data-idx="${realIdx}" data-lib="true">${fmt2(m.usage_rate ?? 0.8, 2)}</td>
+        <td class="editable-cell" data-col="6" data-idx="${realIdx}" data-lib="true">${m.remark || '<span style="color:var(--text-dim);">\u2014</span>'}</td>
+      </tr>`;
+      });
+    }
+    html += `</tbody>`;
+    document.getElementById("matLibTable").innerHTML = html;
+    document.getElementById("matLibSummary").innerHTML = `\u5171 <strong>${MAT_LIB2.length}</strong> \u6761\u6750\u6599 \xB7 \u7B5B\u9009\u663E\u793A <strong>${items.length}</strong> \u6761`;
+  }
+  var _matLibCollapsed = /* @__PURE__ */ new Set();
+  function toggleMatLibGroup(cat) {
+    const key = cat.replace(/[^a-zA-Z0-9]/g, "_");
+    const rows = document.querySelectorAll(".matlib-group-" + key);
+    const icon = document.getElementById("matLibGroupIcon_" + key);
+    if (_matLibCollapsed.has(cat)) {
+      _matLibCollapsed.delete(cat);
+      rows.forEach((r) => r.style.display = "");
+      if (icon) icon.textContent = "\u25BC";
+    } else {
+      _matLibCollapsed.add(cat);
+      rows.forEach((r) => r.style.display = "none");
+      if (icon) icon.textContent = "\u25B6";
+    }
+  }
+  window.toggleMatLibGroup = toggleMatLibGroup;
+  function handleMatLibEdit(cell) {
+    const idx = parseInt(cell.dataset.idx, 10);
+    const colIdx = parseInt(cell.dataset.col, 10);
+    const cols = ["name", "spec", "category", "price", "usage_rate", "remark"];
+    const colTypes = ["text", "text", "text", "number", "number", "text"];
+    const field = cols[colIdx];
+    const item = MAT_LIB2[idx];
+    if (!item) return;
+    if (cell.classList.contains("editing")) return;
+    cell.classList.add("editing");
+    const oldVal = item[field];
+    cell.innerHTML = "";
+    const input = document.createElement("input");
+    input.type = colTypes[colIdx];
+    if (input.type === "number") {
+      input.step = "any";
+    }
+    input.value = oldVal !== null && oldVal !== void 0 ? oldVal : "";
+    cell.appendChild(input);
+    input.focus();
+    input.select();
+    const finish = (save) => {
+      if (save) {
+        const raw = input.value.trim();
+        item[field] = colTypes[colIdx] === "number" ? raw === "" ? null : parseFloat(raw) : raw === "" ? "" : raw;
+      }
+      cell.classList.remove("editing");
+      persistMatLib2();
+      renderMatLib2();
+    };
+    input.addEventListener("blur", () => finish(true));
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        finish(true);
+      }
+      if (e.key === "Escape") finish(false);
+    });
+  }
+  function addMatLibRow() {
+    const id = _nextMatLibId();
+    MAT_LIB2.push({ id, name: "\u65B0\u6750\u6599", spec: "", category: "\u5176\u4ED6", price: 0, usage_rate: 0.8, remark: "" });
+    persistMatLib2();
+    renderMatLib2();
+    showToast2("\u5DF2\u6DFB\u52A0\u65B0\u6750\u6599: " + id);
+  }
+  function deleteMatLibItem(idx) {
+    const m = MAT_LIB2[idx];
+    if (!confirm(`\u786E\u5B9A\u8981\u5220\u9664\u6750\u6599 "${m.name}" (${m.id}) \u5417\uFF1F`)) return;
+    MAT_LIB2.splice(idx, 1);
+    persistMatLib2();
+    renderMatLib2();
+    showToast2("\u5DF2\u5220\u9664: " + m.name);
+  }
+  function exportMatLib() {
+    let csv = "\uFEFF\u6750\u6599ID,\u6750\u6599\u540D\u79F0,\u89C4\u683C,\u5206\u7C7B,\u6807\u51C6\u4EF7\u683C(\u4E07/T),\u5229\u7528\u7387,\u5907\u6CE8\n";
+    MAT_LIB2.forEach((m) => {
+      csv += [m.id, m.name, m.spec || "", m.category, m.price, m.usage_rate ?? 0.8, m.remark || ""].map(csvEscape).join(",") + "\n";
+    });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `\u6750\u6599\u5E93_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast2("\u6750\u6599\u5E93\u5DF2\u5BFC\u51FA");
+  }
+  function importMaterials() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".xlsx,.xls,.csv,.pdf";
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      showToast2("\u6B63\u5728\u89E3\u6790\u6587\u4EF6: " + file.name + "...");
+      try {
+        let rows = [];
+        const ext = file.name.split(".").pop().toLowerCase();
+        if (ext === "csv") {
+          const text = await file.text();
+          rows = parseCSVRows(text);
+        } else if (ext === "xlsx" || ext === "xls") {
+          rows = await parseXLSX(file);
+        } else if (ext === "pdf") {
+          rows = await parsePDF(file);
+          showToast2("PDF\u89E3\u6790\u5B8C\u6210\uFF0C\u8BF7\u68C0\u67E5\u9884\u89C8\u6570\u636E");
+        } else {
+          showToast2("\u4E0D\u652F\u6301\u7684\u6587\u4EF6\u683C\u5F0F: " + ext);
+          return;
+        }
+        if (rows.length === 0) {
+          showToast2("\u672A\u80FD\u4ECE\u6587\u4EF6\u4E2D\u89E3\u6790\u5230\u6570\u636E\uFF0C\u8BF7\u68C0\u67E5\u6587\u4EF6\u683C\u5F0F");
+          return;
+        }
+        showImportPreview(rows, file.name);
+      } catch (err) {
+        showToast2("\u6587\u4EF6\u89E3\u6790\u5931\u8D25: " + err.message);
+        console.error(err);
+      }
+    };
+    input.click();
+  }
+  function parseCSVRows(text) {
+    const lines = text.split(/\r?\n/).filter((l) => l.trim());
+    if (lines.length < 2) return [];
+    const header = lines[0].replace(/^﻿/, "");
+    const cols = header.split(/[,\t]/).map((h) => h.trim().replace(/"/g, ""));
+    const nameIdx = cols.findIndex((c) => /材料名称|名称|name|材料|material/i.test(c));
+    const priceIdx = cols.findIndex((c) => /价格|单价|price|万/i.test(c));
+    const specIdx = cols.findIndex((c) => /规格|spec/i.test(c));
+    const catIdx = cols.findIndex((c) => /分类|类别|category/i.test(c));
+    const usageIdx = cols.findIndex((c) => /利用率|usage|usage_rate|利用系数/i.test(c));
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const vals = lines[i].split(/[,\t]/).map((v) => v.trim().replace(/"/g, ""));
+      if (vals.length < 2) continue;
+      rows.push({
+        name: nameIdx >= 0 ? vals[nameIdx] || "" : vals[0] || "",
+        spec: specIdx >= 0 ? vals[specIdx] || "" : "",
+        category: catIdx >= 0 ? vals[catIdx] || "\u5176\u4ED6" : "\u5176\u4ED6",
+        price: priceIdx >= 0 ? parseFloat(vals[priceIdx]) || 0 : parseFloat(vals[1]) || 0,
+        usage_rate: usageIdx >= 0 ? parseFloat(vals[usageIdx]) || 0.8 : 0.8,
+        remark: ""
+      });
+    }
+    return rows;
+  }
+  async function parseXLSX(file) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target.result);
+        try {
+          const text = new TextDecoder("utf-8").decode(data);
+          if (text.includes(",") || text.includes("	")) {
+            resolve(parseCSVRows(text));
+            return;
+          }
+        } catch (e2) {
+        }
+        const strings = extractStringsFromBinary(data);
+        resolve(stringsToRows(strings));
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  function extractStringsFromBinary(data) {
+    const strs = [];
+    let cur = "";
+    for (let i = 0; i < data.length; i++) {
+      const b = data[i];
+      if (b >= 32 && b < 127) {
+        cur += String.fromCharCode(b);
+      } else {
+        if (cur.length > 3) strs.push(cur);
+        cur = "";
+      }
+    }
+    if (cur.length > 3) strs.push(cur);
+    return strs;
+  }
+  function stringsToRows(strings) {
+    const materialPattern = /[\\钢铜铝铁铸锻绝缘管材]/;
+    const rows = [];
+    let currentName = "";
+    for (const s of strings) {
+      if (materialPattern.test(s) && s.length > 3) {
+        currentName = s;
+      } else if (/^\d+\.?\d*$/.test(s) && currentName) {
+        rows.push({ name: currentName, spec: "", category: "\u5176\u4ED6", price: parseFloat(s), remark: "" });
+        currentName = "";
+      }
+    }
+    return rows;
+  }
+  async function parsePDF(file) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target.result);
+        const text = new TextDecoder("utf-8").decode(data);
+        const lines = text.split(/\r?\n/).filter((l) => l.trim());
+        const rows = [];
+        for (const line of lines) {
+          const parts = line.split(/\s{2,}/);
+          if (parts.length >= 2) {
+            const name = parts[0].trim();
+            const numericParts = parts.filter((p) => /^\d+\.?\d*$/.test(p.trim()));
+            if (numericParts.length >= 1 && name.length > 2) {
+              rows.push({
+                name,
+                spec: parts.length >= 3 ? parts[1].trim() : "",
+                category: "\u5176\u4ED6",
+                price: parseFloat(numericParts[0]) || 0,
+                remark: ""
+              });
+            }
+          }
+        }
+        resolve(rows);
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  var _importPreview = null;
+  function showImportPreview(rows, fileName) {
+    const conflicts = [];
+    rows.forEach((r) => {
+      const existing = MAT_LIB2.find((m) => m.name === r.name);
+      if (existing) conflicts.push({ imported: r, existing });
+    });
+    _importPreview = { rows, conflicts, fileName };
+    window._importPreview = _importPreview;
+    document.getElementById("importPreviewCard").style.display = "block";
+    document.getElementById("importPreviewSub").textContent = `\u6587\u4EF6: ${fileName} \xB7 \u89E3\u6790\u5230 ${rows.length} \u6761\u6570\u636E \xB7 ${conflicts.length} \u6761\u51B2\u7A81`;
+    let html = `<thead><tr>
+    <th style="width:30px;">#</th><th>\u6750\u6599\u540D\u79F0</th><th>\u89C4\u683C</th><th>\u5206\u7C7B</th>
+    <th class="num">\u4EF7\u683C</th><th class="num">\u5229\u7528\u7387</th><th>\u72B6\u6001</th><th>\u64CD\u4F5C</th>
+  </tr></thead><tbody>`;
+    rows.forEach((r, i) => {
+      const isConflict = conflicts.some((c) => c.imported === r);
+      const status = isConflict ? '<span style="color:var(--amber);">\u51B2\u7A81</span>' : '<span style="color:var(--green);">\u65B0\u589E</span>';
+      html += `<tr class="${isConflict ? "" : ""}" id="previewRow${i}">
+      <td>${i + 1}</td>
+      <td class="editable-cell" data-preview="${i}" data-field="name">${r.name}</td>
+      <td class="editable-cell" data-preview="${i}" data-field="spec">${r.spec || "\u2014"}</td>
+      <td class="editable-cell" data-preview="${i}" data-field="category">${r.category}</td>
+      <td class="editable-cell num" data-preview="${i}" data-field="price">${fmt2(r.price, 4)}</td>
+      <td class="editable-cell num" data-preview="${i}" data-field="usage_rate">${fmt2(r.usage_rate ?? 0.8, 2)}</td>
+      <td>${status}${isConflict ? " (\u5DF2\u6709: " + conflicts.find((c) => c.imported === r).existing.id + ")" : ""}</td>
+      <td><button class="btn-reset" onclick="removePreviewRow(${i})" style="font-size:11px;padding:2px 6px;">\u5220\u9664</button></td>
+    </tr>`;
+    });
+    html += `</tbody>`;
+    document.getElementById("importPreviewTable").innerHTML = html;
+    document.getElementById("importConflictInfo").textContent = conflicts.length > 0 ? `\u68C0\u6D4B\u5230 ${conflicts.length} \u6761\u91CD\u590D\u6750\u6599\uFF0C\u5BFC\u5165\u65F6\u5C06\u8986\u76D6\u73B0\u6709\u6570\u636E` : "";
+    if (conflicts.length > 0) {
+      const conflictDiv = document.getElementById("importConflictInfo");
+      conflictDiv.innerHTML = `\u68C0\u6D4B\u5230 ${conflicts.length} \u6761\u91CD\u590D\u6750\u6599 \xB7
+      <button class="btn" onclick="resolveConflicts('skip')" style="font-size:11px;padding:2px 8px;">\u8DF3\u8FC7\u91CD\u590D</button>
+      <button class="btn" onclick="resolveConflicts('overwrite')" style="font-size:11px;padding:2px 8px;">\u8986\u76D6\u73B0\u6709</button>
+      <button class="btn" onclick="resolveConflicts('new')" style="font-size:11px;padding:2px 8px;">\u5168\u90E8\u65B0\u5EFA</button>`;
+    }
+  }
+  function cancelImport() {
+    _importPreview = null;
+    window._importPreview = null;
+    document.getElementById("importPreviewCard").style.display = "none";
+  }
+  function confirmImport() {
+    if (!_importPreview || _importPreview.rows.length === 0) {
+      showToast2("\u6CA1\u6709\u53EF\u5BFC\u5165\u7684\u6570\u636E");
+      return;
+    }
+    let added = 0, updated = 0;
+    _importPreview.rows.forEach((r) => {
+      const existing = MAT_LIB2.find((m) => m.name === r.name);
+      if (existing) {
+        existing.price = r.price;
+        if (r.spec) existing.spec = r.spec;
+        if (r.category !== "\u5176\u4ED6") existing.category = r.category;
+        if (r.usage_rate !== null && r.usage_rate !== void 0) existing.usage_rate = r.usage_rate;
+        updated++;
+      } else {
+        const id = "MAT-" + String(_matLibNextId).padStart(4, "0");
+        _matLibNextId++;
+        MAT_LIB2.push({ id, name: r.name, spec: r.spec || "", category: r.category, price: r.price, usage_rate: r.usage_rate ?? 0.8, remark: r.remark || "" });
+        added++;
+      }
+    });
+    _importPreview.rows.forEach((r) => {
+      const key = r.name.trim().replace(/\s+/g, "");
+      MATERIAL_PRICE_DB2.set(key, { p: r.price, u: r.usage_rate });
+    });
+    PRICE_CACHE2.clear();
+    MAT_IMPORT_LOG2.unshift({
+      time: (/* @__PURE__ */ new Date()).toLocaleString(),
+      fileName: _importPreview.fileName,
+      success: added + updated,
+      fail: 0,
+      remark: `\u65B0\u589E ${added} \u6761\uFF0C\u66F4\u65B0 ${updated} \u6761`
+    });
+    if (MAT_IMPORT_LOG2.length > 100) MAT_IMPORT_LOG2.length = 100;
+    persistMatLib2();
+    cancelImport();
+    renderMatLib2();
+    renderImportLog();
+    showToast2(`\u5BFC\u5165\u5B8C\u6210: \u65B0\u589E ${added} \u6761, \u66F4\u65B0 ${updated} \u6761`);
+    ["water", "gen", "valve", "valve_door"].forEach((k) => FormulaEngine2.recalcTable(k));
+    window.renderAll();
+  }
+  function renderImportLog() {
+    const body = document.getElementById("importLogBody");
+    if (!body) return;
+    if (MAT_IMPORT_LOG2.length === 0) {
+      body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-dim);">\u6682\u65E0\u5BFC\u5165\u8BB0\u5F55</td></tr>';
+      return;
+    }
+    body.innerHTML = MAT_IMPORT_LOG2.map(
+      (l) => `<tr><td>${l.time}</td><td>${l.fileName}</td><td style="color:var(--green);">${l.success}</td><td style="color:var(--red);">${l.fail || 0}</td><td>${l.remark || ""}</td></tr>`
+    ).join("");
+    document.getElementById("importLogInfo").textContent = `\u5171 ${MAT_IMPORT_LOG2.length} \u6761\u5BFC\u5165\u8BB0\u5F55`;
+  }
+  function batchUpdatePrices() {
+    if (!confirm("\u5C06\u7528\u6750\u6599\u5E93\u4E2D\u7684\u6700\u65B0\u6807\u51C6\u4EF7\u683C\u66F4\u65B0\u6240\u6709\u6750\u6599\u660E\u7EC6\u8868\u91D1\u989D\uFF1B\u5229\u7528\u7387\u4FDD\u6301\u6750\u6599\u660E\u7EC6\u884C\u5F53\u524D\u503C\uFF0C\u786E\u5B9A\u7EE7\u7EED\uFF1F")) return;
+    let updated = 0;
+    ["water", "gen", "valve", "valve_door"].forEach((dk) => {
+      const items = DATA2[dk];
+      if (!items) return;
+      items.forEach((row) => {
+        if (!row.material || !row.material.trim()) return;
+        const match = MAT_LIB2.find((m) => m.name === row.material.trim().replace(/\s+/g, ""));
+        if (match) {
+          updated++;
+        }
+      });
+      FormulaEngine2.recalcTable(dk);
+    });
+    persistData2();
+    window.renderAll();
+    showToast2(`\u6279\u91CF\u66F4\u65B0\u5B8C\u6210: \u5339\u914D\u5230 ${updated} \u6761\u6750\u6599`);
+  }
+  function lookupMatLib2(materialName) {
+    if (!materialName || !materialName.trim()) return null;
+    const key = materialName.trim().replace(/\s+/g, "");
+    let match = MAT_LIB2.find((m) => m.name === key);
+    if (match) return match;
+    const parts = key.split("\\");
+    for (let i = parts.length; i >= 1; i--) {
+      const partial = parts.slice(0, i).join("\\");
+      match = MAT_LIB2.find((m) => m.name === partial);
+      if (match) return match;
+    }
+    match = MAT_LIB2.find((m) => m.name.includes(key) || key.includes(m.name));
+    return match || null;
+  }
+
+  // js/src/rendering/scenarios.js
+  function renderScenarios() {
+    const host = document.getElementById("scenarioList");
+    const hint = document.getElementById("scenarioHint");
+    const compare = document.getElementById("scenarioCompareCard");
+    if (state2.scenarios.length === 0) {
+      host.innerHTML = "";
+      hint.textContent = '\u6682\u65E0\u4FDD\u5B58\u7684\u65B9\u6848\u3002\u8C03\u6574\u5DE6\u4FA7\u53C2\u6570\u540E\u70B9\u51FB"\u4FDD\u5B58\u5F53\u524D\u65B9\u6848"\u3002';
+      compare.style.display = "none";
+      return;
+    }
+    hint.textContent = `\u5DF2\u4FDD\u5B58 ${state2.scenarios.length} \u4E2A\u65B9\u6848\uFF0C\u70B9\u51FB\u4EFB\u4E00\u65B9\u6848\u53EF\u52A0\u8F7D\u5230\u5DE6\u4FA7\u53C2\u6570\u9762\u677F`;
+    host.innerHTML = state2.scenarios.map((s, idx) => `
+    <div class="scenario-card" onclick="loadScenario(${idx})">
+      <button class="x-btn" onclick="deleteScenario(${idx}, event)" title="\u5220\u9664">\xD7</button>
+      <div class="scenario-card-name">${escHtml2(s.name)}</div>
+      <div class="scenario-card-value">${fmt2(s.totalBid, 0)} \u4E07</div>
+      <div class="scenario-card-stats">\u5355\u53F0 ${fmt2(s.perUnit, 0)} \xB7 \u6D88\u5316 ${fmt2(s.absorbPct * 100, 1)}%</div>
+      <div class="scenario-card-stats">\u52A0\u4EF7 ${Math.round(s.inputs.selfMarkup * 100)}%/${Math.round(s.inputs.buyMarkup * 100)}% \xB7 ${s.inputs.distance}km</div>
+    </div>
+  `).join("");
+    if (state2.scenarios.length >= 2) {
+      compare.style.display = "block";
+      const rows = [
+        { label: "\u9879\u76EE\u540D\u79F0", fn: (s) => s.inputs.projectName },
+        { label: "\u673A\u7EC4\u53F0\u6570", fn: (s) => s.inputs.unitCount + " \u53F0" },
+        { label: "\u6C34\u673A\u91CD\u91CF", fn: (s) => fmt2(s.inputs.waterWeight, 1) + " T" },
+        { label: "\u53D1\u673A\u91CD\u91CF", fn: (s) => fmt2(s.inputs.genWeight, 1) + " T" },
+        { label: "\u9600\u95E8\u91CD\u91CF", fn: (s) => fmt2(s.inputs.valveWeight, 1) + " T" },
+        { label: "\u81EA\u5236\u52A0\u4EF7", fn: (s) => Math.round(s.inputs.selfMarkup * 100) + "%" },
+        { label: "\u5916\u8D2D\u52A0\u4EF7", fn: (s) => Math.round(s.inputs.buyMarkup * 100) + "%" },
+        { label: "\u8FD0\u8F93\u8DDD\u79BB", fn: (s) => s.inputs.distance + " km" },
+        { label: "\u62DF\u6295\u6807\u603B\u4EF7", fn: (s) => fmt2(s.totalBid, 2) + " \u4E07", highlight: true },
+        { label: "\u5355\u53F0\u62A5\u4EF7", fn: (s) => fmt2(s.perUnit, 2) + " \u4E07", highlight: true },
+        { label: "\u56FA\u5B9A\u6210\u672C", fn: (s) => fmt2(s.totalFixed, 2) + " \u4E07" },
+        { label: "\u6D88\u5316\u5360\u6BD4", fn: (s) => fmt2(s.absorbPct * 100, 2) + "%", highlight: true }
+      ];
+      const html = `
+      <thead><tr>
+        <th>\u5BF9\u6BD4\u9879</th>
+        ${state2.scenarios.map((s) => `<th>${escHtml2(s.name)}</th>`).join("")}
+      </tr></thead>
+      <tbody>
+        ${rows.map((r) => `<tr ${r.highlight ? 'class="subtotal"' : ""}>
+          <td><strong>${r.label}</strong></td>
+          ${state2.scenarios.map((s) => `<td>${r.fn(s)}</td>`).join("")}
+        </tr>`).join("")}
+      </tbody>`;
+      document.getElementById("scenarioCompareTable").innerHTML = html;
+    } else {
+      compare.style.display = "none";
+    }
+  }
+  function saveScenario() {
+    const r = compute();
+    const name = prompt("\u65B9\u6848\u540D\u79F0\uFF1A", `\u65B9\u6848 ${state2.scenarios.length + 1}`);
+    if (!name) return;
+    takeProjectSnapshot2("\u4FDD\u5B58\u65B9\u6848");
+    state2.scenarios.push({
+      name,
+      inputs: { ...r.inputs },
+      totalBid: r.totalBid,
+      totalFixed: r.totalFixed,
+      absorbPct: r.absorbPct,
+      perUnit: r.inputs.unitCount > 0 ? r.totalBid / r.inputs.unitCount : 0
+    });
+    if (state2.scenarios.length > 8) state2.scenarios.shift();
+    renderScenarios();
+  }
+  function loadScenario(idx) {
+    const s = state2.scenarios[idx];
+    takeProjectSnapshot2("\u52A0\u8F7D\u65B9\u6848");
+    Object.keys(s.inputs).forEach((k) => {
+      const el = document.getElementById(k);
+      if (el && k !== "hasWater" && k !== "hasGen" && k !== "hasValve") {
+        el.value = k === "selfMarkup" || k === "buyMarkup" ? s.inputs[k] * 100 : s.inputs[k];
+      }
+    });
+    state2.hasWater = s.inputs.hasWater;
+    state2.hasGen = s.inputs.hasGen;
+    state2.hasValve = s.inputs.hasValve;
+    syncToggles2();
+    updateSliderDisplays2();
+    window.renderAll();
+  }
+  function deleteScenario(idx, e) {
+    e.stopPropagation();
+    takeProjectSnapshot2("\u5220\u9664\u65B9\u6848");
+    state2.scenarios.splice(idx, 1);
+    renderScenarios();
+  }
+  function resetDefaults() {
+    if (!confirm("\u786E\u5B9A\u8981\u6062\u590D\u6240\u6709\u53C2\u6570\u5230\u9ED8\u8BA4\u503C\u5417\uFF1F")) return;
+    takeProjectSnapshot2("\u91CD\u7F6E\u9ED8\u8BA4\u53C2\u6570");
+    Object.keys(DEFAULTS).forEach((k) => {
+      const el = document.getElementById(k);
+      if (el) el.value = DEFAULTS[k];
+    });
+    state2.hasWater = state2.hasGen = state2.hasValve = 1;
+    syncToggles2();
+    updateSliderDisplays2();
+    window.renderAll();
+  }
+  function jumpToMaterial(machineKey) {
+    const matTabMap = { water: "water", gen: "gen", valve: "valve_door" };
+    const matTab = matTabMap[machineKey] || "water";
+    state2.currentMatTab = matTab;
+    document.querySelectorAll("#tabsNav button").forEach((x) => x.classList.remove("active"));
+    document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
+    const matNavBtn = document.querySelector('#tabsNav button[data-page="materials"]');
+    if (matNavBtn) matNavBtn.classList.add("active");
+    const matPage = document.getElementById("page-materials");
+    if (matPage) matPage.classList.add("active");
+    document.querySelectorAll("#matTabs button").forEach((x) => x.classList.toggle("on", x.dataset.mat === matTab));
+    window.renderMaterials();
+    showToast2("\u5DF2\u8DF3\u8F6C\u5230" + (machineKey === "water" ? "\u6C34\u8F6E\u673A" : machineKey === "gen" ? "\u53D1\u7535\u673A" : "\u8FDB\u6C34\u9600(\u6574\u673A)") + "\u6750\u6599\u660E\u7EC6");
+  }
+  function syncToggles2() {
+    document.querySelectorAll("#waterToggle button").forEach((b) => b.classList.toggle("on", parseInt(b.dataset.v, 10) === state2.hasWater));
+    document.querySelectorAll("#genToggle button").forEach((b) => b.classList.toggle("on", parseInt(b.dataset.v, 10) === state2.hasGen));
+    document.querySelectorAll("#valveToggle button").forEach((b) => b.classList.toggle("on", parseInt(b.dataset.v, 10) === state2.hasValve));
+  }
+  function updateSliderDisplays2() {
+    const selfDisp = document.getElementById("selfMarkupDisp");
+    const buyDisp = document.getElementById("buyMarkupDisp");
+    const distDisp = document.getElementById("distanceDisp");
+    const selfSlider = document.getElementById("selfMarkup");
+    const buySlider = document.getElementById("buyMarkup");
+    const distSlider = document.getElementById("distance");
+    if (selfDisp && selfSlider && selfDisp !== document.activeElement) selfDisp.value = selfSlider.value;
+    if (buyDisp && buySlider && buyDisp !== document.activeElement) buyDisp.value = buySlider.value;
+    if (distDisp && distSlider && distDisp !== document.activeElement) distDisp.value = distSlider.value;
+  }
+  (function bindSliderDispInputs() {
+    const pairs = [
+      { dispId: "selfMarkupDisp", sliderId: "selfMarkup", min: 0, max: 200 },
+      { dispId: "buyMarkupDisp", sliderId: "buyMarkup", min: 0, max: 50 },
+      { dispId: "distanceDisp", sliderId: "distance", min: 100, max: 8e3 }
+    ];
+    pairs.forEach(({ dispId, sliderId, min, max }) => {
+      const disp = document.getElementById(dispId);
+      const slider = document.getElementById(sliderId);
+      if (!disp || !slider) return;
+      disp.addEventListener("input", () => {
+        let v = parseFloat(disp.value);
+        if (isNaN(v)) return;
+        v = Math.max(min, Math.min(max, v));
+        slider.value = v;
+        window.renderAll();
+      });
+      disp.addEventListener("blur", () => {
+        let v = parseFloat(disp.value);
+        if (isNaN(v)) v = parseFloat(slider.value);
+        v = Math.max(min, Math.min(max, v));
+        disp.value = v;
+        slider.value = v;
+        window.renderAll();
+      });
+      disp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          disp.blur();
+        }
+        if (e.key === "Escape") {
+          disp.value = slider.value;
+          disp.blur();
+        }
+      });
+    });
+  })();
+
+  // js/src/rendering/index.js
+  function renderAll2() {
+    const safeRender = function(name, fn) {
+      try {
+        fn();
+      } catch (e) {
+        console.error("renderAll: " + name + " \u5931\u8D25:", e);
+        if (!window._renderErrorShown) {
+          window._renderErrorShown = true;
+          showToast2("\u6E32\u67D3 " + name + " \u65F6\u51FA\u9519\uFF0C\u90E8\u5206\u5185\u5BB9\u53EF\u80FD\u672A\u66F4\u65B0");
+        }
+      }
+    };
+    window._renderErrorShown = false;
+    safeRender("syncSidebarFromMaterials", syncSidebarFromMaterials);
+    var r;
+    try {
+      r = compute();
+    } catch (e) {
+      console.error("compute \u5931\u8D25:", e);
+      showToast2("\u8BA1\u7B97\u65F6\u51FA\u9519");
+      return;
+    }
+    safeRender("renderOverview", function() {
+      renderOverview(r);
+    });
+    safeRender("renderMachines", function() {
+      renderMachines(r);
+    });
+    safeRender("renderCharts", function() {
+      renderCharts(r);
+    });
+    safeRender("renderTransport", function() {
+      renderTransport(r);
+    });
+    safeRender("renderAgency", function() {
+      renderAgency(r);
+    });
+    safeRender("renderBidAnalysis", function() {
+      renderBidAnalysis(r);
+    });
+    safeRender("renderMaterials", renderMaterials2);
+    safeRender("renderParts", renderParts2);
+    safeRender("renderTools", renderTools2);
+    safeRender("renderAuto", renderAuto);
+    safeRender("renderLiaison", renderLiaison);
+    safeRender("renderMatLib", renderMatLib2);
+    safeRender("renderScenarios", renderScenarios);
+    safeRender("renderImportLog", renderImportLog);
+    safeRender("updateExportButtons", updateExportButtons);
+  }
+
+  // js/src/export.js
+  function handlePrint() {
+    if (!window.hasAnyMachine()) {
+      window.showToast("\u8BF7\u81F3\u5C11\u9009\u62E9\u4E00\u4E2A\u4E3B\u673A\u7C7B\u578B\u540E\u518D\u6253\u5370");
+      return;
+    }
+    window.print();
+  }
+  function exportCSV() {
+    if (!window.hasAnyMachine()) {
+      window.showToast("\u8BF7\u81F3\u5C11\u9009\u62E9\u4E00\u4E2A\u4E3B\u673A\u7C7B\u578B\u540E\u518D\u5BFC\u51FA");
+      return;
+    }
+    const r = window.compute();
+    let csv = "\uFEFF";
+    csv += `\u6C34\u7535\u7AD9\u6295\u6807\u4EF7\u683C\u5206\u6790\u62A5\u544A
+`;
+    csv += `\u9879\u76EE\u540D\u79F0,${window.csvEscape(r.inputs.projectName)}
+`;
+    csv += `\u673A\u7EC4\u53F0\u6570,${r.inputs.unitCount}
+`;
+    csv += `\u6C34\u8F6E\u673A,${window.state.hasWater ? "\u6709" : "\u65E0"}
+`;
+    csv += `\u53D1\u7535\u673A,${window.state.hasGen ? "\u6709" : "\u65E0"}
+`;
+    csv += `\u9600\u95E8,${window.state.hasValve ? "\u6709" : "\u65E0"}
+
+`;
+    csv += `=== \u62A5\u4EF7\u660E\u7EC6 ===
+`;
+    csv += `\u9879\u76EE,\u5355\u53F0\u81EA\u5236,\u5355\u53F0\u5916\u8D2D,\u81EA\u5236\u52A0\u4EF7,\u5916\u8D2D\u52A0\u4EF7,\u5355\u53F0\u6210\u672C,\u6570\u91CF,\u5355\u4EF7,\u603B\u4EF7
+`;
+    r.items.forEach((it) => {
+      csv += `${it.name},${it.self.toFixed(2)},${it.buy.toFixed(2)},${it.selfM.toFixed(2)},${it.buyM.toFixed(2)},${it.cost.toFixed(2)},${it.qty},${it.unit.toFixed(2)},${it.total.toFixed(2)}
+`;
+    });
+    csv += `
+\u62DF\u6295\u6807\u603B\u4EF7 (\u4E07\u5143),${r.totalBid.toFixed(2)}
+`;
+    csv += `\u56FA\u5B9A\u6210\u672C (\u4E07\u5143),${r.totalFixed.toFixed(2)}
+`;
+    csv += `\u6D88\u5316\u8D39\u7528 (\u4E07\u5143),${r.absorb.toFixed(2)}
+`;
+    csv += `\u6D88\u5316\u5360\u6BD4,${(r.absorbPct * 100).toFixed(2)}%
+`;
+    csv += `\u62DB\u6807\u4EE3\u7406\u8D39 (\u4E07\u5143),${r.agencyFee.fee.toFixed(2)}
+`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${r.inputs.projectName}_\u62A5\u4EF7_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // js/src/ui/events.js
+  function setupEvents() {
+    document.querySelectorAll("input").forEach((el) => {
+      el.addEventListener("input", () => {
+        window.updateSliderDisplays();
+        if (el.classList.contains("auto-computed")) {
+          const curVal = parseFloat(el.value);
+          const compVal = window._matComputed[el.id] !== void 0 ? parseFloat(window._matComputed[el.id].toFixed(4)) : NaN;
+          if (!isNaN(curVal) && !isNaN(compVal) && Math.abs(curVal - compVal) > 1e-3) {
+            window._sidebarOverrides.add(el.id);
+          } else {
+            window._sidebarOverrides.delete(el.id);
+          }
+          window.checkSidebarConsistency();
+          const r = window.compute();
+          window.renderOverview(r);
+          window.renderMachines(r);
+          window.renderCharts(r);
+          window.renderTransport(r);
+          window.renderAgency(r);
+          window.renderScenarios();
+        } else {
+          window.renderAll();
+        }
+      });
+      if (el.classList.contains("auto-computed")) {
+        el.addEventListener("dblclick", () => {
+          if (window._matComputed[el.id] !== void 0) {
+            window._sidebarOverrides.delete(el.id);
+            el.value = window._matComputed[el.id].toFixed ? parseFloat(window._matComputed[el.id].toFixed(4)).toString() : window._matComputed[el.id].toString();
+            window.checkSidebarConsistency();
+            window.renderAll();
+            window.showToast("\u5DF2\u6062\u590D\u4E3A\u6750\u6599\u6C47\u603B\u503C");
+          }
+        });
+      }
+    });
+    document.querySelectorAll("#tabsNav button").forEach((b) => {
+      b.addEventListener("click", () => {
+        document.querySelectorAll("#tabsNav button").forEach((x) => x.classList.remove("active"));
+        document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
+        b.classList.add("active");
+        document.getElementById("page-" + b.dataset.page).classList.add("active");
+        window.renderAll();
+      });
+    });
+    document.querySelectorAll("#waterToggle button").forEach((b) => {
+      b.addEventListener("click", () => {
+        window.state.hasWater = parseInt(b.dataset.v, 10);
+        handleMachineToggle();
+      });
+    });
+    document.querySelectorAll("#genToggle button").forEach((b) => {
+      b.addEventListener("click", () => {
+        window.state.hasGen = parseInt(b.dataset.v, 10);
+        handleMachineToggle();
+      });
+    });
+    document.querySelectorAll("#valveToggle button").forEach((b) => {
+      b.addEventListener("click", () => {
+        window.state.hasValve = parseInt(b.dataset.v, 10);
+        handleMachineToggle();
+      });
+    });
+    document.querySelectorAll("#matTabs button").forEach((b) => {
+      b.addEventListener("click", () => {
+        document.querySelectorAll("#matTabs button").forEach((x) => x.classList.remove("on"));
+        b.classList.add("on");
+        window.state.currentMatTab = b.dataset.mat;
+        window.renderMaterials();
+      });
+    });
+    document.querySelectorAll("#partsTabs button").forEach((b) => {
+      b.addEventListener("click", () => {
+        document.querySelectorAll("#partsTabs button").forEach((x) => x.classList.remove("on"));
+        b.classList.add("on");
+        window.state.currentPartsTab = b.dataset.key;
+        window.renderParts();
+      });
+    });
+    document.querySelectorAll("#toolsTabs button").forEach((b) => {
+      b.addEventListener("click", () => {
+        document.querySelectorAll("#toolsTabs button").forEach((x) => x.classList.remove("on"));
+        b.classList.add("on");
+        window.state.currentToolsTab = b.dataset.key;
+        window.renderTools();
+      });
+    });
+    document.getElementById("matSearch").addEventListener("input", window.renderMaterials);
+    document.getElementById("matFilter").addEventListener("change", window.renderMaterials);
+    document.getElementById("autoSearch").addEventListener("input", window.renderAuto);
+    const matLibSearchEl = document.getElementById("matLibSearch");
+    if (matLibSearchEl) matLibSearchEl.addEventListener("input", window.renderMatLib);
+    const matLibCatFilterEl = document.getElementById("matLibCatFilter");
+    if (matLibCatFilterEl) matLibCatFilterEl.addEventListener("change", window.renderMatLib);
+    document.addEventListener("dblclick", function(e) {
+      if (e.target.closest("#rowEditOverlay") || e.target.closest("#matPickerPanel")) return;
+      const row = e.target.closest("#autoTable tr.row-editable");
+      if (!row) return;
+      const cell = row.querySelector(".editable-cell");
+      if (!cell) return;
+      const rowIdx = parseInt(cell.dataset.origIdx || cell.dataset.idx, 10);
+      if (isNaN(rowIdx)) return;
+      e.preventDefault();
+      window.openRowEditModal("data", { dataKey: "automation", rowIdx, config: window._tableConfigs.autoTable });
+    });
+    document.addEventListener("dblclick", function(e) {
+      if (e.target.closest("#rowEditOverlay") || e.target.closest("#matPickerPanel")) return;
+      const libRow = e.target.closest("tr");
+      if (libRow && libRow.querySelector('[data-lib="true"]')) {
+        const c = libRow.querySelector('[data-lib="true"]');
+        if (c && c.dataset.idx !== void 0) {
+          e.preventDefault();
+          window.openRowEditModal("matlib", { idx: parseInt(c.dataset.idx, 10) });
+          return;
+        }
+      }
+      const cell = e.target.closest(".editable-cell");
+      if (!cell) return;
+      const tableEl = cell.closest("table");
+      if (!tableEl) return;
+      const config = window._tableConfigs[tableEl.id];
+      if (!config) return;
+      const rowIdx = parseInt(cell.dataset.origIdx || cell.dataset.idx, 10);
+      e.preventDefault();
+      window.openRowEditModal("data", { dataKey: config.dataKey, rowIdx, config });
+    });
+    document.addEventListener("click", function(e) {
+      if (e.target.closest(".row-edit-btn")) return;
+      const cell = e.target.closest("#autoTable .editable-cell");
+      if (!cell || cell.classList.contains("formula-cell")) return;
+      e.stopPropagation();
+      window.EditableTable.handleClick(e, window._tableConfigs.autoTable);
+    });
+    document.addEventListener("click", function(e) {
+      if (e.target.closest(".row-edit-btn")) return;
+      const cell = e.target.closest(".editable-cell");
+      if (!cell || cell.classList.contains("formula-cell")) return;
+      if (cell.dataset.lib === "true") {
+        window.handleMatLibEdit(cell);
+        return;
+      }
+      if (cell.dataset.preview !== void 0) {
+        handlePreviewEdit(cell);
+        return;
+      }
+      const tableEl = cell.closest("table");
+      if (!tableEl) return;
+      const config = window._tableConfigs[tableEl.id];
+      if (!config) return;
+      window.EditableTable.handleClick(e, config);
+    });
+    const tabBtns = document.querySelectorAll("#tabsNav button");
+    tabBtns.forEach((b) => {
+      if (b.dataset.page === "bidanalysis") {
+        b.addEventListener("click", () => {
+          const r = window.compute();
+          window.renderBidAnalysis(r);
+        });
+      }
+    });
+    document.getElementById("projectName").addEventListener("input", updatePageTitle);
+    updatePageTitle();
+  }
+  function handleMachineToggle() {
+    window.autoSwitchPartsTab();
+    window.autoSwitchToolsTab();
+    window.syncToggles();
+    window.renderAll();
+    window.showToast("\u5DF2\u81EA\u52A8\u66F4\u65B0\u5907\u4EF6\u548C\u5DE5\u5177\u6E05\u5355\u53CA\u6C47\u603B\u6570\u636E");
+  }
+  function handlePreviewEdit(cell) {
+    const idx = parseInt(cell.dataset.preview, 10);
+    const field = cell.dataset.field;
+    if (!window._importPreview || idx >= window._importPreview.rows.length) return;
+    if (cell.classList.contains("editing")) return;
+    cell.classList.add("editing");
+    const oldVal = window._importPreview.rows[idx][field];
+    const isNum = field === "price";
+    cell.innerHTML = "";
+    const input = document.createElement("input");
+    input.type = isNum ? "number" : "text";
+    if (isNum) {
+      input.step = "any";
+    }
+    input.value = oldVal !== null && oldVal !== void 0 ? oldVal : "";
+    cell.appendChild(input);
+    input.focus();
+    input.select();
+    const finish = (save) => {
+      if (save) {
+        const raw = input.value.trim();
+        window._importPreview.rows[idx][field] = isNum ? raw === "" ? 0 : parseFloat(raw) : raw;
+        window.showImportPreview(window._importPreview.rows, window._importPreview.fileName);
+      } else {
+        cell.classList.remove("editing");
+        cell.innerHTML = window.EditableTable.cellDisplay(oldVal, { type: isNum ? "number" : "text" });
+      }
+    };
+    input.addEventListener("blur", () => finish(true));
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        finish(true);
+      }
+      if (e.key === "Escape") finish(false);
+    });
+  }
+  function updatePageTitle() {
+    try {
+      const r = window.compute();
+      const name = document.getElementById("projectName").value || "\u6C34\u7535\u7AD9";
+      document.title = `${name} \xB7 ${window.fmt(r.totalBid, 0)}\u4E07 \xB7 \u6295\u6807\u5206\u6790\u7CFB\u7EDF`;
+    } catch (e) {
+    }
+  }
+
+  // js/src/ui/context-menu.js
+  function setupContextMenu() {
+    const menu = document.createElement("div");
+    menu.id = "et-ctx-menu";
+    menu.style.display = "none";
+    menu.innerHTML = `
+    <div class="ctx-label" id="ctx-row-label">\u884C\u64CD\u4F5C</div>
+    <div class="ctx-item" id="ctx-edit">\u270E &nbsp;\u5F39\u7A97\u7F16\u8F91</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-label">\u63D2\u5165\u884C</div>
+    <div class="ctx-item" id="ctx-insert-after">\uFF0B \u63D2\u5165\u540C\u7EA7\u884C\uFF08\u4E4B\u540E\uFF09</div>
+    <div class="ctx-item" id="ctx-add-child">\u21B3 \u6DFB\u52A0\u5B50\u884C</div>
+    <div class="ctx-item" id="ctx-add-child2" style="padding-left:24px;font-size:12px;">\u21B3\u21B3 \u6DFB\u52A0\u5B50\u5B50\u884C</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-label">\u5C55\u5F00 / \u6536\u8D77</div>
+    <div class="ctx-item" id="ctx-expand">\u25BC \u5C55\u5F00\u6240\u6709\u5B50\u884C</div>
+    <div class="ctx-item" id="ctx-collapse">\u25B6 \u6536\u8D77\u6240\u6709\u5B50\u884C</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item danger" id="ctx-delete">\u{1F5D1} \u5220\u9664\u884C</div>
+  `;
+    document.body.appendChild(menu);
+    let _ctxDataKey = null, _ctxIdx = null, _ctxSeq = null;
+    function closeMenu() {
+      menu.style.display = "none";
+    }
+    document.addEventListener("contextmenu", (e) => {
+      const tr = e.target.closest("tr[data-orig-idx]");
+      if (!tr) return;
+      const table = tr.closest("table");
+      if (!table) return;
+      let dataKey = null;
+      for (const k of Object.keys(window._tableConfigs)) {
+        if (window._tableConfigs[k].tableId === table.id) {
+          dataKey = window._tableConfigs[k].dataKey;
+          break;
+        }
+      }
+      if (!dataKey) return;
+      e.preventDefault();
+      _ctxIdx = parseInt(tr.dataset.origIdx, 10);
+      _ctxDataKey = dataKey;
+      _ctxSeq = tr.dataset.seq || "";
+      const row = (window.DATA[dataKey] || [])[_ctxIdx];
+      const seqLabel = row ? row.seq || row.name || `\u7B2C${_ctxIdx + 1}\u884C` : "";
+      document.getElementById("ctx-row-label").textContent = `\u884C: ${String(seqLabel).slice(0, 20)}`;
+      const items = window.DATA[dataKey] || [];
+      let directKids;
+      if (_ctxSeq === "\u4E00") {
+        directKids = items.filter((r) => /^\d+$/.test(String(r.seq || ""))).length;
+      } else {
+        const pfx = _ctxSeq + ".";
+        const depth = _ctxSeq.split(".").length;
+        directKids = items.filter((r) => {
+          const rs = String(r.seq || "");
+          return rs.startsWith(pfx) && rs.split(".").length === depth + 1;
+        }).length;
+      }
+      const hasAnyChildren = directKids >= 1;
+      document.getElementById("ctx-expand").style.display = hasAnyChildren ? "" : "none";
+      document.getElementById("ctx-collapse").style.display = hasAnyChildren ? "" : "none";
+      menu.style.display = "block";
+      const vw = window.innerWidth, vh = window.innerHeight;
+      let x = e.clientX + 4, y = e.clientY + 4;
+      menu.style.left = (x + 180 > vw ? vw - 185 : x) + "px";
+      menu.style.top = (y + 320 > vh ? vh - 325 : y) + "px";
+    });
+    document.addEventListener("click", (e) => {
+      if (!menu.contains(e.target)) closeMenu();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeMenu();
+    });
+    function act(fn) {
+      closeMenu();
+      if (_ctxDataKey !== null && _ctxIdx !== null) fn(_ctxDataKey, _ctxIdx, _ctxSeq);
+    }
+    document.getElementById("ctx-edit").onclick = () => act((dk, idx) => window.EditableTable.openRowModal(dk, idx));
+    document.getElementById("ctx-insert-after").onclick = () => act((dk, idx) => window.EditableTable.insertAfter(dk, idx));
+    document.getElementById("ctx-add-child").onclick = () => act((dk, idx) => window.EditableTable.addChildRow(dk, idx));
+    document.getElementById("ctx-add-child2").onclick = () => act((dk, idx) => {
+      const items = window.DATA[dk] || [];
+      const parentItem = items[idx];
+      if (!parentItem) return;
+      const childSeq = window.generateChildSeq(items, parentItem);
+      const parentSeq = String(parentItem.seq);
+      const existingChild = items.find((r) => String(r.seq) === childSeq);
+      if (existingChild) {
+        const childIdx = items.indexOf(existingChild);
+        window.EditableTable.addChildRow(dk, childIdx);
+      } else {
+        window.EditableTable.addChildRow(dk, idx);
+        setTimeout(() => {
+          const newItems = window.DATA[dk] || [];
+          const newChild = newItems.find((r) => String(r.seq) === childSeq);
+          if (newChild) window.EditableTable.addChildRow(dk, newItems.indexOf(newChild));
+        }, 50);
+      }
+    });
+    function toggleAllChildren(dk, seq, collapse) {
+      const items = window.DATA[dk] || [];
+      const countKids = (s) => {
+        if (s === "\u4E00") {
+          return items.filter((r) => /^\d+$/.test(String(r.seq || ""))).length;
+        }
+        const pfx = s + ".";
+        const d = s.split(".").length;
+        return items.filter((r) => {
+          const rs = String(r.seq || "");
+          return rs.startsWith(pfx) && rs.split(".").length === d + 1;
+        }).length;
+      };
+      items.forEach((r) => {
+        const s = String(r.seq || "");
+        if (s.startsWith(seq + ".") && countKids(s) >= 1) {
+          const key = `et_collapsed_${dk}_${s}`;
+          if (collapse) sessionStorage.setItem(key, "1");
+          else sessionStorage.removeItem(key);
+        }
+      });
+      if (countKids(seq) >= 1) {
+        const key = `et_collapsed_${dk}_${seq}`;
+        if (collapse) sessionStorage.setItem(key, "1");
+        else sessionStorage.removeItem(key);
+      }
+      const cfg = window._tableConfigs[Object.keys(window._tableConfigs).find((k) => window._tableConfigs[k].dataKey === dk)];
+      if (cfg) window.EditableTable.render(cfg);
+    }
+    document.getElementById("ctx-expand").onclick = () => act((dk, idx, seq) => toggleAllChildren(dk, seq, false));
+    document.getElementById("ctx-collapse").onclick = () => act((dk, idx, seq) => toggleAllChildren(dk, seq, true));
+    document.getElementById("ctx-delete").onclick = () => act((dk, idx) => window.EditableTable.deleteRow(dk, idx));
+  }
+
+  // js/src/ui/index.js
+  function setupUI() {
+    (function() {
+      const btn = document.getElementById("themeToggle");
+      const html = document.documentElement;
+      const saved = localStorage.getItem("hydro_theme");
+      if (saved) {
+        html.setAttribute("data-theme", saved);
+        btn.textContent = saved === "dark" ? "\u2600\uFE0F" : "\u{1F319}";
+      }
+      btn.addEventListener("click", () => {
+        const isDark = html.getAttribute("data-theme") === "dark";
+        const next = isDark ? "light" : "dark";
+        html.setAttribute("data-theme", next);
+        btn.textContent = next === "dark" ? "\u2600\uFE0F" : "\u{1F319}";
+        localStorage.setItem("hydro_theme", next);
+        setTimeout(() => {
+          window.renderAll();
+        }, 50);
+        window.showToast(next === "dark" ? "\u{1F319} \u5DF2\u5207\u6362\u6DF1\u8272\u6A21\u5F0F" : "\u2600\uFE0F \u5DF2\u5207\u6362\u4EAE\u8272\u6A21\u5F0F");
+      });
+    })();
+    (function restoreSidebar() {
+      try {
+        const saved = localStorage.getItem("hydro_sidebar_collapsed");
+        if (saved === "1") {
+          const sidebar = document.getElementById("sidebar");
+          const main = document.querySelector(".main");
+          const btn = document.getElementById("sidebarToggle");
+          sidebar.classList.add("collapsed");
+          main.classList.add("sidebar-collapsed");
+          btn.textContent = "\u25B6";
+          btn.title = "\u5C55\u5F00\u4FA7\u8FB9\u680F";
+        }
+      } catch (e) {
+      }
+    })();
+  }
+  function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    const main = document.querySelector(".main");
+    const btn = document.getElementById("sidebarToggle");
+    const isCollapsed = sidebar.classList.toggle("collapsed");
+    main.classList.toggle("sidebar-collapsed", isCollapsed);
+    btn.textContent = isCollapsed ? "\u25B6" : "\u25C0";
+    btn.title = isCollapsed ? "\u5C55\u5F00\u4FA7\u8FB9\u680F" : "\u9690\u85CF\u4FA7\u8FB9\u680F";
+    try {
+      localStorage.setItem("hydro_sidebar_collapsed", isCollapsed ? "1" : "0");
+    } catch (e) {
+    }
+    window.dispatchEvent(new Event("resize"));
+  }
+
+  // js/src/ui/keyboard.js
+  var _activeTreeRow = null;
+  function setupKeyboard() {
+    document.addEventListener("click", (e) => {
+      const tr = e.target.closest("tr[data-seq]");
+      if (!tr) return;
+      const tag = e.target.tagName;
+      if (tag === "INPUT" || tag === "BUTTON" || tag === "SELECT" || tag === "TEXTAREA") return;
+      const dk = tr.dataset.datakey;
+      const seq = tr.dataset.seq;
+      if (dk && seq) _activeTreeRow = { dataKey: dk, seq };
+    });
+    document.addEventListener("keydown", function(e) {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === "s") {
+          e.preventDefault();
+          window.saveHTML();
+          window.showToast("\u{1F4BE} \u5DF2\u4FDD\u5B58");
+        }
+        if (e.key === "z") {
+          e.preventDefault();
+          window.undoProjectSnapshot();
+        }
+        if (e.key === "y") {
+          e.preventDefault();
+          window.redoProjectSnapshot();
+        }
+      }
+      const tabs = document.querySelectorAll("#tabsNav button");
+      if (e.altKey && !isNaN(parseInt(e.key))) {
+        const idx = parseInt(e.key) - 1;
+        if (idx >= 0 && idx < tabs.length) tabs[idx].click();
+      }
+      if (e.altKey && e.key === "ArrowDown") {
+        if (_activeTreeRow) {
+          e.preventDefault();
+          const seq = _activeTreeRow.seq;
+          const key = `et_collapsed_${_activeTreeRow.dataKey}_${seq}`;
+          const isCollapsed = sessionStorage.getItem(key) === "1";
+          window.EditableTable.toggleCollapse(_activeTreeRow.dataKey, seq);
+          window.showToast(isCollapsed ? `\u5C55\u5F00 ${seq}` : `\u6536\u8D77 ${seq}`);
+        }
+      }
+    });
+  }
+
+  // js/src/ui/column-resize.js
+  var TABLE_RESIZE_STORAGE_KEY = "hydro_table_resize_v1";
+  function loadTableResizePrefs() {
+    try {
+      return JSON.parse(localStorage.getItem(TABLE_RESIZE_STORAGE_KEY) || "{}") || {};
+    } catch (e) {
+      return {};
+    }
+  }
+  function saveTableResizePrefs(prefs) {
+    try {
+      localStorage.setItem(TABLE_RESIZE_STORAGE_KEY, JSON.stringify(prefs || {}));
+    } catch (e) {
+    }
+  }
+  function getTableResizeKey(el) {
+    if (!el) return "";
+    const table = el.matches("table") ? el : el.querySelector("table");
+    if (table && table.id) return table.id;
+    if (el.id) return el.id;
+    const card = el.closest(".card");
+    const title = card ? (card.querySelector(".card-title")?.innerText || "").trim().replace(/\s+/g, "_") : "";
+    const idx = Array.from(document.querySelectorAll(".table-wrap, #autoTable.auto-tree")).indexOf(el);
+    return title ? `${title}_${idx}` : `table_${idx}`;
+  }
+  function resetResizableTableSize(key) {
+    const prefs = loadTableResizePrefs();
+    delete prefs[key];
+    saveTableResizePrefs(prefs);
+    applyResizableTables2();
+    window.showToast("\u5DF2\u6062\u590D\u8BE5\u8868\u683C\u9ED8\u8BA4\u5C3A\u5BF8");
+  }
+  function resetAllResizableTableSizes() {
+    saveTableResizePrefs({});
+    document.querySelectorAll(".table-wrap, #autoTable.auto-tree").forEach((el) => {
+      el.style.width = "";
+      el.style.height = "";
+    });
+    applyResizableTables2();
+    window.showToast("\u5DF2\u6062\u590D\u5168\u90E8\u8868\u683C\u9ED8\u8BA4\u5C3A\u5BF8");
+  }
+  function applyResizableTables2() {
+    const prefs = loadTableResizePrefs();
+    document.querySelectorAll(".table-wrap, #autoTable.auto-tree").forEach((el) => {
+      const key = getTableResizeKey(el);
+      if (!key) return;
+      el.dataset.resizeKey = key;
+      el.classList.add("user-resizable-table");
+      const pref = prefs[key];
+      if (pref) {
+        if (pref.width) el.style.width = pref.width + "px";
+        if (pref.height) el.style.height = pref.height + "px";
+      } else if (!el.style.height && el.classList.contains("table-wrap")) {
+        const inlineMax = parseFloat(el.style.maxHeight || "");
+        if (!isNaN(inlineMax) && inlineMax > 0) el.style.height = inlineMax + "px";
+      }
+      const card = el.closest(".card");
+      if (card && !el.previousElementSibling?.classList?.contains("table-resize-hint")) {
+        const hint = document.createElement("div");
+        hint.className = "table-resize-hint";
+        hint.innerHTML = `\u62D6\u62FD\u8868\u683C\u53F3\u4E0B\u89D2\u53EF\u8C03\u6574\u663E\u793A\u5927\u5C0F <button type="button" onclick="resetResizableTableSize('${key.replace(/'/g, "\\'")}')">\u6062\u590D\u9ED8\u8BA4</button>`;
+        el.parentNode.insertBefore(hint, el);
+      }
+      if (el._tableResizeObserver) return;
+      let saveTimer = null;
+      el._tableResizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const target = entry.target;
+          const rect = target.getBoundingClientRect();
+          if (!rect.width || !rect.height) continue;
+          clearTimeout(saveTimer);
+          saveTimer = setTimeout(() => {
+            const p = loadTableResizePrefs();
+            p[target.dataset.resizeKey || getTableResizeKey(target)] = {
+              width: Math.round(rect.width),
+              height: Math.round(rect.height)
+            };
+            saveTableResizePrefs(p);
+          }, 220);
+        }
+      });
+      el._tableResizeObserver.observe(el);
+    });
+  }
+  var COL_RESIZE_KEY = "hydro_col_resize_v1";
+  function loadColResizePrefs() {
+    try {
+      return JSON.parse(localStorage.getItem(COL_RESIZE_KEY) || "{}") || {};
+    } catch (e) {
+      return {};
+    }
+  }
+  function saveColResizePrefs(p) {
+    try {
+      localStorage.setItem(COL_RESIZE_KEY, JSON.stringify(p || {}));
+    } catch (e) {
+    }
+  }
+  function applyColResize(table) {
+    if (!table) return;
+    const tableKey = table.id || "";
+    const prefs = loadColResizePrefs()[tableKey] || {};
+    const ths = table.querySelectorAll("thead th");
+    const cols = table.querySelectorAll("col");
+    ths.forEach((th, i) => {
+      const saved = prefs[i];
+      if (saved && cols[i]) {
+        cols[i].style.width = saved + "px";
+      }
+      if (th.querySelector(".col-resize-handle")) return;
+      const handle = document.createElement("span");
+      handle.className = "col-resize-handle";
+      handle.style.cssText = "position:absolute;right:0;top:0;bottom:0;width:5px;cursor:col-resize;user-select:none;z-index:3;";
+      th.style.position = "relative";
+      th.appendChild(handle);
+      let startX = 0, startW = 0;
+      handle.addEventListener("mousedown", function(e) {
+        e.preventDefault();
+        startX = e.clientX;
+        startW = th.offsetWidth;
+        const onMove = (mv) => {
+          const delta = mv.clientX - startX;
+          const newW = Math.max(40, startW + delta);
+          if (cols[i]) cols[i].style.width = newW + "px";
+        };
+        const onUp = (mu) => {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          const p = loadColResizePrefs();
+          if (!p[tableKey]) p[tableKey] = {};
+          p[tableKey][i] = cols[i] ? parseInt(cols[i].style.width) : th.offsetWidth;
+          saveColResizePrefs(p);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    });
+  }
+  (function() {
+    const s = document.createElement("style");
+    s.textContent = `.col-resize-handle:hover, .col-resize-handle:active { background: var(--blue); opacity: 0.5; border-radius: 2px; }`;
+    document.head.appendChild(s);
+  })();
+  setTimeout(() => {
+    ["matTable", "partsTable", "toolsTable", "autoTable", "monitorTable", "liaisonTable"].forEach((id) => {
+      const t = document.getElementById(id);
+      if (t) applyColResize(t);
+    });
+  }, 500);
+
   // js/src/main.js
   Object.assign(window, data_exports);
   window.openRowEditModal = openRowEditModal;
@@ -4701,5 +6801,87 @@
   window.DEFAULTS = DEFAULTS;
   window.state = state2;
   window.fmt = fmt2;
+  window.renderAll = renderAll2;
+  window.renderOverview = renderOverview;
+  window.renderMachines = renderMachines;
+  window.renderCharts = renderCharts;
+  window.renderMaterials = renderMaterials2;
+  window.renderParts = renderParts2;
+  window.renderTools = renderTools2;
+  window.renderAuto = renderAuto;
+  window.renderTransport = renderTransport;
+  window.renderLiaison = renderLiaison;
+  window.renderAgency = renderAgency;
+  window.renderMatLib = renderMatLib2;
+  window.renderImportLog = renderImportLog;
+  window.toggleMatLibGroup = toggleMatLibGroup;
+  window.handleMatLibEdit = handleMatLibEdit;
+  window.addMatLibRow = addMatLibRow;
+  window.deleteMatLibItem = deleteMatLibItem;
+  window.exportMatLib = exportMatLib;
+  window.importMaterials = importMaterials;
+  window.cancelImport = cancelImport;
+  window.confirmImport = confirmImport;
+  window.batchUpdatePrices = batchUpdatePrices;
+  window.lookupMatLib = lookupMatLib2;
+  window._importPreview = _importPreview;
+  window.renderScenarios = renderScenarios;
+  window.saveScenario = saveScenario;
+  window.loadScenario = loadScenario;
+  window.deleteScenario = deleteScenario;
+  window.resetDefaults = resetDefaults;
+  window.jumpToMaterial = jumpToMaterial;
+  window.syncToggles = syncToggles2;
+  window.updateSliderDisplays = updateSliderDisplays2;
+  window.renderBidAnalysis = renderBidAnalysis;
+  window.updateExportButtons = updateExportButtons;
+  window.handlePrint = handlePrint;
+  window.exportCSV = exportCSV;
+  window.handleMachineToggle = handleMachineToggle;
+  window.updatePageTitle = updatePageTitle;
+  window.toggleSidebar = toggleSidebar;
+  window.applyResizableTables = applyResizableTables2;
+  window.applyColResize = applyColResize;
+  window.resetAllResizableTableSizes = resetAllResizableTableSizes;
+  window.resetResizableTableSize = resetResizableTableSize;
+  window._matComputed = _matComputed;
+  window._sidebarOverrides = _sidebarOverrides2;
+  setupUI();
+  setupContextMenu();
+  setupKeyboard();
+  setupEvents();
+  (function() {
+    const originalRenderAll = renderAll2;
+    window.renderAll = function() {
+      const result = originalRenderAll.apply(this, arguments);
+      setTimeout(applyResizableTables2, 0);
+      return result;
+    };
+  })();
+  (function() {
+    const origRender = window.EditableTable.render.bind(window.EditableTable);
+    window.EditableTable.render = function(config) {
+      origRender(config);
+      setTimeout(() => {
+        const table = document.getElementById(config.tableId);
+        if (table) applyColResize(table);
+      }, 0);
+    };
+  })();
+  if (window.loadPersistedData()) {
+  }
+  if (window.DATA._sidebar || window.DATA._state || window.DATA._matLib || window.DATA._importLog) {
+    window.restoreProjectState({ data: window.DATA, _sidebar: window.DATA._sidebar, _state: window.DATA._state, _matLib: window.DATA._matLib, _importLog: window.DATA._importLog }, { silent: true });
+    delete window.DATA._sidebar;
+    delete window.DATA._state;
+    delete window.DATA._matLib;
+    delete window.DATA._importLog;
+    delete window.DATA._projectVersion;
+    delete window.DATA._exportedAt;
+    window.persistData();
+  }
+  window.updateSliderDisplays();
+  window.renderAll();
+  window.applyResizableTables();
   console.log("Hydro Bid System \u6A21\u5757\u5316\u5165\u53E3\u5DF2\u52A0\u8F7D");
 })();

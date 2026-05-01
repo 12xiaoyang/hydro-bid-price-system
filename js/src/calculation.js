@@ -4,7 +4,7 @@
 import { DATA, MATERIAL_PRICE_DB, PRICE_CACHE, YUAN_TO_WAN, lookupMaterialPrice } from './data.js';
 
 export let MAT_LIB = [];
-let _matLibNextId = 1;
+export let _matLibNextId = 1;
 export let MAT_IMPORT_LOG = [];
 let _importPreview = null; // { rows: [], conflicts: [] }
 
@@ -84,7 +84,7 @@ function initMatLib() {
     if (saved) MAT_IMPORT_LOG = JSON.parse(saved);
   } catch(e) {}
 }
-function persistMatLib() {
+export function persistMatLib() {
   try { localStorage.setItem('hydro_mat_lib', JSON.stringify(MAT_LIB)); } catch(e) {}
   try { localStorage.setItem('hydro_import_log', JSON.stringify(MAT_IMPORT_LOG)); } catch(e) {}
 }
@@ -749,8 +749,8 @@ export function fixAllConsistency() {
 
 // 材料明细→侧边栏的联动
 let _syncing = false;
-let _matComputed = {};          // 材料汇总计算值
-let _sidebarOverrides = new Set(); // 用户手动修改过的侧边栏字段ID
+export let _matComputed = {};          // 材料汇总计算值
+export let _sidebarOverrides = new Set(); // 用户手动修改过的侧边栏字段ID
 
 export function syncSidebarFromMaterials() {
   if (_syncing) return;
