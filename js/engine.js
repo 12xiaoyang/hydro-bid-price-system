@@ -1,5 +1,6 @@
 // ============ 材料库数据 ============
 // Material Library: structured material database with full metadata
+import { DATA, MATERIAL_PRICE_DB, PRICE_CACHE } from './src/data.js';
 let MAT_LIB = [];
 let _matLibNextId = 1;
 let MAT_IMPORT_LOG = [];

@@ -311,7 +311,7 @@
   // js/engine.js
   var MAT_LIB2 = [];
   var _matLibNextId2 = 1;
-  var MAT_IMPORT_LOG = [];
+  var MAT_IMPORT_LOG2 = [];
   function initMatLib() {
     const categoryMap = {
       "Q235": "\u677F\u6750\u7C7B",
@@ -420,7 +420,7 @@
     }
     MAT_LIB2 = [];
     _matLibNextId2 = 1;
-    for (const [key, val] of MATERIAL_PRICE_DB) {
+    for (const [key, val] of MATERIAL_PRICE_DB2) {
       const existing = MAT_LIB2.find((m) => m.name === key);
       if (existing) continue;
       MAT_LIB2.push({
@@ -447,7 +447,7 @@
     }
     try {
       const saved = localStorage.getItem("hydro_import_log");
-      if (saved) MAT_IMPORT_LOG = JSON.parse(saved);
+      if (saved) MAT_IMPORT_LOG2 = JSON.parse(saved);
     } catch (e) {
     }
   }
@@ -514,29 +514,29 @@
       vars: ["child.amount"]
     }
   };
-  var CUSTOM_FORMULAS = DATA._customFormulas && typeof DATA._customFormulas === "object" ? DATA._customFormulas : {};
-  DATA._customFormulas = CUSTOM_FORMULAS;
+  var CUSTOM_FORMULAS2 = DATA2._customFormulas && typeof DATA2._customFormulas === "object" ? DATA2._customFormulas : {};
+  DATA2._customFormulas = CUSTOM_FORMULAS2;
   function getFormulaExpr2(formulaId) {
     const def = DEFAULT_FORMULAS2[formulaId];
     if (!def) return "";
-    const custom = CUSTOM_FORMULAS && CUSTOM_FORMULAS[formulaId];
+    const custom = CUSTOM_FORMULAS2 && CUSTOM_FORMULAS2[formulaId];
     return custom && typeof custom.expr === "string" && custom.expr.trim() ? custom.expr.trim() : def.expr;
   }
   function setCustomFormula2(formulaId, expr) {
     if (!formulaId || !DEFAULT_FORMULAS2[formulaId]) return;
-    if (!DATA._customFormulas || typeof DATA._customFormulas !== "object") DATA._customFormulas = {};
-    CUSTOM_FORMULAS = DATA._customFormulas;
+    if (!DATA2._customFormulas || typeof DATA2._customFormulas !== "object") DATA2._customFormulas = {};
+    CUSTOM_FORMULAS2 = DATA2._customFormulas;
     const def = DEFAULT_FORMULAS2[formulaId];
     const normalized = String(expr || "").trim();
     if (!normalized || normalized === def.expr) {
-      delete CUSTOM_FORMULAS[formulaId];
+      delete CUSTOM_FORMULAS2[formulaId];
     } else {
-      CUSTOM_FORMULAS[formulaId] = { expr: normalized, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+      CUSTOM_FORMULAS2[formulaId] = { expr: normalized, updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
     }
   }
   function resetCustomFormula(formulaId) {
-    if (CUSTOM_FORMULAS && CUSTOM_FORMULAS[formulaId]) delete CUSTOM_FORMULAS[formulaId];
-    if (DATA._customFormulas && DATA._customFormulas[formulaId]) delete DATA._customFormulas[formulaId];
+    if (CUSTOM_FORMULAS2 && CUSTOM_FORMULAS2[formulaId]) delete CUSTOM_FORMULAS2[formulaId];
+    if (DATA2._customFormulas && DATA2._customFormulas[formulaId]) delete DATA2._customFormulas[formulaId];
   }
   function parseQtyValue2(v) {
     if (typeof v === "string" && v.includes("\xD7")) {
@@ -645,7 +645,7 @@
     },
     // Recalculate all formula cells for a table
     recalcTable(dataKey) {
-      const items = DATA[dataKey];
+      const items = DATA2[dataKey];
       if (!items) return;
       const isMatBOM = ["water", "gen", "valve", "valve_door"].includes(dataKey);
       if (isMatBOM) {
@@ -3209,6 +3209,310 @@
     return items.length;
   };
 
+  // js/src/persistence.js
+  var DATA_BACKUP = {};
+  (function backupData() {
+    for (const key of Object.keys(DATA2)) {
+      DATA_BACKUP[key] = JSON.parse(JSON.stringify(DATA2[key]));
+    }
+  })();
+  function resetDataTable(key) {
+    if (DATA_BACKUP[key]) {
+      DATA2[key] = JSON.parse(JSON.stringify(DATA_BACKUP[key]));
+      if (typeof PRICE_CACHE2 !== "undefined" && typeof PRICE_CACHE2.clear === "function") PRICE_CACHE2.clear();
+      if (typeof FormulaEngine !== "undefined" && FormulaEngine.recalcTable) FormulaEngine.recalcTable(key);
+      persistData2();
+      return true;
+    }
+    return false;
+  }
+  var STORAGE_KEY = "hydro_bid_data_v2";
+  var PROJECT_EXPORT_VERSION = "2.1.0-stable";
+  var PROJECT_DATA_KEYS = ["water", "gen", "valve", "valve_door", "water_parts", "gen_parts", "valve_parts", "water_tools", "gen_tools", "valve_tools", "automation", "monitoring", "liaison"];
+  function stableClone(obj) {
+    try {
+      if (typeof structuredClone === "function") return structuredClone(obj);
+    } catch (e) {
+    }
+    return JSON.parse(JSON.stringify(obj));
+  }
+  function getProjectDataTables() {
+    const out = {};
+    PROJECT_DATA_KEYS.forEach((k) => {
+      if (DATA2[k]) out[k] = stableClone(DATA2[k]);
+    });
+    return out;
+  }
+  function captureProjectState() {
+    return { app: "hydro-bid-price-analysis-system", version: PROJECT_EXPORT_VERSION, exportedAt: (/* @__PURE__ */ new Date()).toISOString(), data: getProjectDataTables(), _sidebar: captureSidebarState(), _customFormulas: stableClone(CUSTOM_FORMULAS || {}), _state: { hasWater: state.hasWater, hasGen: state.hasGen, hasValve: state.hasValve, scenarios: stableClone(state.scenarios || []), currentMatTab: state.currentMatTab, currentPartsTab: state.currentPartsTab, currentToolsTab: state.currentToolsTab }, _matLib: typeof MAT_LIB !== "undefined" ? stableClone(MAT_LIB) : [], _importLog: typeof MAT_IMPORT_LOG !== "undefined" ? stableClone(MAT_IMPORT_LOG) : [] };
+  }
+  function normalizeImportedProject(input) {
+    const raw = input && typeof input === "object" ? input : {};
+    const data = raw.data && typeof raw.data === "object" ? raw.data : raw;
+    const out = { app: raw.app || "hydro-bid-price-analysis-system", version: raw.version || "legacy", data: {}, _sidebar: raw._sidebar || data._sidebar || null, _state: raw._state || data._state || {}, _matLib: raw._matLib || data._matLib || [], _importLog: raw._importLog || data._importLog || [] };
+    PROJECT_DATA_KEYS.forEach((k) => {
+      if (Array.isArray(data[k])) out.data[k] = data[k];
+    });
+    if (!Array.isArray(out._state.scenarios) && Array.isArray(data.scenarios)) out._state.scenarios = data.scenarios;
+    return out;
+  }
+  function restoreProjectState(projectPackage, opts = {}) {
+    const pkg = normalizeImportedProject(projectPackage);
+    const _isRestoringSnapshot = true;
+    try {
+      PROJECT_DATA_KEYS.forEach((k) => {
+        if (pkg.data && Array.isArray(pkg.data[k])) DATA2[k] = stableClone(pkg.data[k]);
+      });
+      if (pkg._matLib && typeof MAT_LIB !== "undefined" && Array.isArray(pkg._matLib)) {
+        MAT_LIB.length = 0;
+        pkg._matLib.forEach((m) => MAT_LIB.push(m));
+        _matLibNextId = Math.max(0, ...MAT_LIB.map((m) => parseInt(String(m.id || "MAT-0000").replace("MAT-", ""), 10) || 0)) + 1;
+        try {
+          localStorage.setItem("hydro_mat_lib", JSON.stringify(MAT_LIB));
+        } catch (e) {
+        }
+      }
+      if (pkg._importLog && typeof MAT_IMPORT_LOG !== "undefined" && Array.isArray(pkg._importLog)) {
+        MAT_IMPORT_LOG.length = 0;
+        pkg._importLog.forEach((x) => MAT_IMPORT_LOG.push(x));
+        try {
+          localStorage.setItem("hydro_import_log", JSON.stringify(MAT_IMPORT_LOG));
+        } catch (e) {
+        }
+      }
+      if (pkg._customFormulas || pkg.data && pkg.data._customFormulas) {
+        DATA2._customFormulas = stableClone(pkg._customFormulas || pkg.data._customFormulas || {});
+        try {
+          localStorage.setItem("hydro_custom_formulas", JSON.stringify(DATA2._customFormulas));
+        } catch (e) {
+        }
+      }
+      if (pkg._sidebar) restoreSidebarState(pkg._sidebar);
+      if (pkg._state) {
+        state.hasWater = pkg._state.hasWater !== void 0 ? pkg._state.hasWater : state.hasWater;
+        state.hasGen = pkg._state.hasGen !== void 0 ? pkg._state.hasGen : state.hasGen;
+        state.hasValve = pkg._state.hasValve !== void 0 ? pkg._state.hasValve : state.hasValve;
+        state.scenarios = Array.isArray(pkg._state.scenarios) ? stableClone(pkg._state.scenarios) : state.scenarios || [];
+        state.currentMatTab = pkg._state.currentMatTab || state.currentMatTab || "water";
+        state.currentPartsTab = pkg._state.currentPartsTab || state.currentPartsTab || "water_parts";
+        state.currentToolsTab = pkg._state.currentToolsTab || state.currentToolsTab || "water_tools";
+        syncToggles();
+      }
+      PRICE_CACHE2.clear();
+      PROJECT_DATA_KEYS.forEach((k) => {
+        if (DATA2[k]) FormulaEngine.recalcTable(k);
+      });
+      if (typeof _sidebarOverrides !== "undefined") _sidebarOverrides.clear();
+      updateSliderDisplays();
+      persistData2();
+      renderAll();
+      if (!opts.silent) showToast("\u9879\u76EE\u5DF2\u6062\u590D");
+    } finally {
+    }
+  }
+  function exportProjectJSON() {
+    return JSON.stringify(captureProjectState(), null, 2);
+  }
+  function importProjectJSON(text) {
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      throw new Error("\u4E0D\u662F\u6709\u6548\u7684 JSON \u6587\u4EF6");
+    }
+    return normalizeImportedProject(parsed);
+  }
+  function sanitizeFileName(name) {
+    return String(name || "project").replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, "_").slice(0, 120);
+  }
+  function exportProjectFile() {
+    const report = generateDataHealthReport();
+    if (!report.passed) {
+      const ok = confirm("\u6570\u636E\u4F53\u68C0\u53D1\u73B0 " + report.summary.errorCount + " \u4E2A\u9519\u8BEF\u3001" + report.summary.warningCount + " \u4E2A\u8B66\u544A\u3002\u4ECD\u8981\u5BFC\u51FA\u9879\u76EE\u5417\uFF1F");
+      if (!ok) {
+        showDataHealthReport(report);
+        return;
+      }
+    }
+    const blob = new Blob([exportProjectJSON()], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const projectName = (document.getElementById("projectName") || {}).value || "\u6C34\u7535\u7AD9\u62A5\u4EF7";
+    a.href = url;
+    a.download = sanitizeFileName(projectName) + "_\u5B8C\u6574\u9879\u76EE.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("\u5B8C\u6574\u9879\u76EE JSON \u5DF2\u5BFC\u51FA");
+  }
+  function persistData2() {
+    try {
+      const toSave = {};
+      for (const key of [
+        "water",
+        "gen",
+        "valve",
+        "valve_door",
+        "water_parts",
+        "gen_parts",
+        "valve_parts",
+        "water_tools",
+        "gen_tools",
+        "valve_tools",
+        "automation",
+        "monitoring",
+        "liaison"
+      ]) {
+        if (DATA2[key]) toSave[key] = DATA2[key];
+      }
+      toSave._customFormulas = CUSTOM_FORMULAS || {};
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    } catch (e) {
+      console.warn("\u4FDD\u5B58\u5931\u8D25:", e);
+      showToast("\u6570\u636E\u4FDD\u5B58\u5931\u8D25: " + (e.message || "\u5B58\u50A8\u7A7A\u95F4\u4E0D\u8DB3"));
+    }
+  }
+  function saveHTML() {
+    try {
+      persistData2();
+      const projectPackage = captureProjectState();
+      const dataClone = Object.assign({}, projectPackage.data, {
+        _sidebar: projectPackage._sidebar,
+        _state: projectPackage._state,
+        _matLib: projectPackage._matLib,
+        _importLog: projectPackage._importLog,
+        _customFormulas: CUSTOM_FORMULAS || {},
+        _projectVersion: projectPackage.version,
+        _exportedAt: projectPackage.exportedAt
+      });
+      const dataStr = "const DATA = " + JSON.stringify(dataClone) + ";";
+      const html = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+      const lines = html.split(/\r?\n/);
+      let replaced = false;
+      for (let i = 0; i < lines.length; i++) {
+        if (/^\s*const DATA = \{/.test(lines[i])) {
+          lines[i] = dataStr;
+          replaced = true;
+          break;
+        }
+      }
+      if (!replaced) {
+        showToast("\u672A\u627E\u5230 DATA \u58F0\u660E\uFF0C\u4FDD\u5B58\u5931\u8D25");
+        return;
+      }
+      const modified = lines.join("\n");
+      const blob = new Blob([modified], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const projectName = (document.getElementById("projectName") || {}).value || "\u6C34\u7535\u7AD9\u62A5\u4EF7";
+      a.download = projectName + "_\u4EF7\u683C\u5206\u6790\u7CFB\u7EDF.html";
+      a.click();
+      URL.revokeObjectURL(url);
+      delete DATA2._sidebar;
+      showToast("HTML \u5DF2\u4FDD\u5B58\uFF0C\u6240\u6709\u6570\u636E\u53CA\u53C2\u6570\u5DF2\u5D4C\u5165\u6587\u4EF6\u4E2D");
+    } catch (e) {
+      showToast("\u4FDD\u5B58\u5931\u8D25: " + e.message);
+      console.error(e);
+    }
+  }
+  function captureSidebarState() {
+    const el = (id) => document.getElementById(id);
+    return {
+      projectName: (el("projectName") || {}).value || "",
+      unitCount: (el("unitCount") || {}).value || "4",
+      selfMarkup: (el("selfMarkup") || {}).value || "15",
+      buyMarkup: (el("buyMarkup") || {}).value || "7",
+      transportRate: (el("transportRate") || {}).value || "",
+      distance: (el("distance") || {}).value || "200",
+      tonKmPrice: (el("tonKmPrice") || {}).value || "0.7",
+      tonKmPriceWide: (el("tonKmPriceWide") || {}).value || "1.2",
+      wideWeight: (el("wideWeight") || {}).value || "50",
+      transportExtra: (el("transportExtra") || {}).value || "1.5",
+      partsAmt: (el("partsAmt") || {}).value || "0",
+      toolsAmt: (el("toolsAmt") || {}).value || "0",
+      autoAmt: (el("autoAmt") || {}).value || "0",
+      monitorAmt: (el("monitorAmt") || {}).value || "0",
+      liaisonAmt: (el("liaisonAmt") || {}).value || "0",
+      hasWater: state.hasWater,
+      hasGen: state.hasGen,
+      hasValve: state.hasValve
+    };
+  }
+  function restoreSidebarState(sidebar) {
+    if (!sidebar) return;
+    const el = (id) => document.getElementById(id);
+    const fields = [
+      "projectName",
+      "unitCount",
+      "selfMarkup",
+      "buyMarkup",
+      "transportRate",
+      "distance",
+      "tonKmPrice",
+      "tonKmPriceWide",
+      "wideWeight",
+      "transportExtra",
+      "partsAmt",
+      "toolsAmt",
+      "autoAmt",
+      "monitorAmt",
+      "liaisonAmt"
+    ];
+    for (const f of fields) {
+      const elem = el(f);
+      if (elem && sidebar[f] !== void 0) {
+        elem.value = sidebar[f];
+      }
+    }
+    if (sidebar.hasWater !== void 0) state.hasWater = sidebar.hasWater;
+    if (sidebar.hasGen !== void 0) state.hasGen = sidebar.hasGen;
+    if (sidebar.hasValve !== void 0) state.hasValve = sidebar.hasValve;
+    syncToggles();
+  }
+  function importFullData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        takeProjectSnapshot("\u5BFC\u5165\u9879\u76EE");
+        const pkg = importProjectJSON(e.target.result);
+        restoreProjectState(pkg, { silent: true });
+        const rowCount = PROJECT_DATA_KEYS.reduce((sum, k) => sum + (Array.isArray(DATA2[k]) ? DATA2[k].length : 0), 0);
+        const report = generateDataHealthReport();
+        if (!report.passed) showToast("\u5BFC\u5165\u6210\u529F\uFF0C\u4F46\u4F53\u68C0\u53D1\u73B0 " + report.summary.errorCount + " \u9519\u8BEF / " + report.summary.warningCount + " \u8B66\u544A");
+        else showToast("\u6210\u529F\u5BFC\u5165\u5B8C\u6574\u9879\u76EE\uFF0C\u5171 " + rowCount + " \u6761\u6570\u636E");
+      } catch (err) {
+        showToast("\u5BFC\u5165\u5931\u8D25: " + err.message);
+        console.error(err);
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  }
+  function loadPersistedData() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        for (const key of Object.keys(parsed)) {
+          if (key === "_sidebar") continue;
+          if (DATA2[key]) DATA2[key] = parsed[key];
+        }
+        PRICE_CACHE2.clear();
+        if (DATA2._customFormulas && typeof DATA2._customFormulas === "object") {
+        }
+        for (const key of Object.keys(parsed)) {
+          if (key === "_sidebar") continue;
+          FormulaEngine.recalcTable(key);
+        }
+        return true;
+      }
+    } catch (e) {
+    }
+    return false;
+  }
+
   // js/src/main.js
   Object.assign(window, data_exports);
   window.FormulaEngine = FormulaEngine2;
@@ -3218,5 +3522,23 @@
   window.ImportWizard = ImportWizard;
   window.TABLE_SCHEMAS = TABLE_SCHEMAS;
   window.FIELD_ALIASES = FIELD_ALIASES;
-  console.log("\u2705 Hydro Bid System \u6A21\u5757\u5316\u5165\u53E3\u5DF2\u52A0\u8F7D");
+  window.DATA_BACKUP = DATA_BACKUP;
+  window.resetDataTable = resetDataTable;
+  window.STORAGE_KEY = STORAGE_KEY;
+  window.PROJECT_EXPORT_VERSION = PROJECT_EXPORT_VERSION;
+  window.PROJECT_DATA_KEYS = PROJECT_DATA_KEYS;
+  window.captureProjectState = captureProjectState;
+  window.normalizeImportedProject = normalizeImportedProject;
+  window.restoreProjectState = restoreProjectState;
+  window.exportProjectJSON = exportProjectJSON;
+  window.importProjectJSON = importProjectJSON;
+  window.sanitizeFileName = sanitizeFileName;
+  window.exportProjectFile = exportProjectFile;
+  window.persistData = persistData2;
+  window.saveHTML = saveHTML;
+  window.captureSidebarState = captureSidebarState;
+  window.restoreSidebarState = restoreSidebarState;
+  window.importFullData = importFullData;
+  window.loadPersistedData = loadPersistedData;
+  console.log("Hydro Bid System \u6A21\u5757\u5316\u5165\u53E3\u5DF2\u52A0\u8F7D");
 })();
