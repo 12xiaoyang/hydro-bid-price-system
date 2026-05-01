@@ -150,7 +150,7 @@ function autoFixUsageRates() {
 function autoFixSequences(dataKey) {
   if (!['water','gen','valve','valve_door'].includes(dataKey)) return { tables: 0, rows: 0 };
   const items = DATA[dataKey];
-  if (!items || items.length === 0) return { tables: 0, rows: 0 };
+  if (!Array.isArray(items) || items.length === 0) return { tables: 0, rows: 0 };
 
   // Helper: check if seq is pure numeric (e.g. "1", "2.3", "1.2.3")
   const isNumericSeq = (s) => /^\d+(\.\d+)*$/.test(s);
@@ -211,7 +211,6 @@ function autoFixSequences(dataKey) {
     });
   });
 
-  if (fixed > 0) persistData();
   return { tables: fixed > 0 ? 1 : 0, rows: fixed };
 }
 
