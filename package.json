@@ -6,11 +6,10 @@
     "build": "esbuild js/src/main.js --bundle --outfile=js/dist/bundle.js",
     "watch": "esbuild js/src/main.js --bundle --outfile=js/dist/bundle.js --watch"
   },
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
+    "esbuild": "^0.25.12",
     "playwright": "^1.59.1",
     "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "esbuild": "^0.25.12"
   }
 }

@@ -1217,7 +1217,14 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>if(typeof Chart==='undefined'){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';document.head.appendChild(s);}</script>
 
+<!-- ES Module bundle (via esbuild) -->
 <script src="js/dist/bundle.js"></script>
+<!-- TODO: Phase 1 Task 1.2 -- 移除以下旧 script 标签，由 bundle.js 统一提供 -->
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/app.js"></script>
+<script src="js/import-wizard.js"></script>
 
 <!-- SheetJS (xlsx): Excel 解析库 -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
