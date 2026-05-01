@@ -3258,7 +3258,7 @@
   }
   function restoreProjectState(projectPackage, opts = {}) {
     const pkg = normalizeImportedProject(projectPackage);
-    const _isRestoringSnapshot = true;
+    const _isRestoringSnapshot2 = true;
     try {
       PROJECT_DATA_KEYS.forEach((k) => {
         if (pkg.data && Array.isArray(pkg.data[k])) DATA2[k] = stableClone(pkg.data[k]);
@@ -3513,6 +3513,40 @@
     return false;
   }
 
+  // js/src/state.js
+  var SNAPSHOT_MAX = 60;
+  var _projectUndoStack = [];
+  var _projectRedoStack = [];
+  var _isRestoringSnapshot = false;
+  function takeProjectSnapshot2(label) {
+    if (_isRestoringSnapshot) return;
+    _projectUndoStack.push({ id: Date.now() + "_" + Math.random().toString(16).slice(2), label: label || "\u64CD\u4F5C", createdAt: (/* @__PURE__ */ new Date()).toISOString(), state: captureProjectState() });
+    while (_projectUndoStack.length > SNAPSHOT_MAX) _projectUndoStack.shift();
+    _projectRedoStack.length = 0;
+  }
+  function undoProjectSnapshot() {
+    const snap = _projectUndoStack.pop();
+    if (!snap) {
+      showToast("\u6CA1\u6709\u53EF\u64A4\u9500\u7684\u64CD\u4F5C");
+      return false;
+    }
+    _projectRedoStack.push({ id: Date.now() + "_" + Math.random().toString(16).slice(2), label: "\u91CD\u505A\u70B9", createdAt: (/* @__PURE__ */ new Date()).toISOString(), state: captureProjectState() });
+    restoreProjectState(snap.state, { silent: true });
+    showToast("\u5DF2\u64A4\u9500\uFF1A" + snap.label);
+    return true;
+  }
+  function redoProjectSnapshot() {
+    const snap = _projectRedoStack.pop();
+    if (!snap) {
+      showToast("\u6CA1\u6709\u53EF\u91CD\u505A\u7684\u64CD\u4F5C");
+      return false;
+    }
+    _projectUndoStack.push({ id: Date.now() + "_" + Math.random().toString(16).slice(2), label: "\u64A4\u9500\u70B9", createdAt: (/* @__PURE__ */ new Date()).toISOString(), state: captureProjectState() });
+    restoreProjectState(snap.state, { silent: true });
+    showToast("\u5DF2\u91CD\u505A");
+    return true;
+  }
+
   // js/src/main.js
   Object.assign(window, data_exports);
   window.FormulaEngine = FormulaEngine2;
@@ -3540,5 +3574,9 @@
   window.restoreSidebarState = restoreSidebarState;
   window.importFullData = importFullData;
   window.loadPersistedData = loadPersistedData;
+  window.SNAPSHOT_MAX = SNAPSHOT_MAX;
+  window.takeProjectSnapshot = takeProjectSnapshot2;
+  window.undoProjectSnapshot = undoProjectSnapshot;
+  window.redoProjectSnapshot = redoProjectSnapshot;
   console.log("Hydro Bid System \u6A21\u5757\u5316\u5165\u53E3\u5DF2\u52A0\u8F7D");
 })();

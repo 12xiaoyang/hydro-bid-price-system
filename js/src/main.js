@@ -12,6 +12,7 @@ import {
   persistData, saveHTML, captureSidebarState, restoreSidebarState,
   importFullData, loadPersistedData
 } from './persistence.js';
+import { SNAPSHOT_MAX, takeProjectSnapshot, undoProjectSnapshot, redoProjectSnapshot } from './state.js';
 
 // 全局数据引用（保持与现有代码兼容）
 Object.assign(window, Data);
@@ -42,5 +43,11 @@ window.captureSidebarState = captureSidebarState;
 window.restoreSidebarState = restoreSidebarState;
 window.importFullData = importFullData;
 window.loadPersistedData = loadPersistedData;
+
+// 快照 / 撤销重做
+window.SNAPSHOT_MAX = SNAPSHOT_MAX;
+window.takeProjectSnapshot = takeProjectSnapshot;
+window.undoProjectSnapshot = undoProjectSnapshot;
+window.redoProjectSnapshot = redoProjectSnapshot;
 
 console.log('Hydro Bid System 模块化入口已加载');
