@@ -1,7 +1,7 @@
 // js/src/main.js — 项目入口
 // Phase 1: 导入所有模块，通过 window 暴露给内联 onclick
 
-import * as Data from '../data.js';
+import * as Data from './data.js';
 import { FormulaEngine } from '../engine.js';
 import { openRowEditModal, closeRowEditModal, EditableTable } from '../editor.js';
 import { ImportWizard, TABLE_SCHEMAS, FIELD_ALIASES } from '../import-wizard.js';

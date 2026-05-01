@@ -5,7 +5,7 @@
       __defProp(target, name, { get: all[name], enumerable: true });
   };
 
-  // js/data.js
+  // js/src/data.js
   var data_exports = {};
   __export(data_exports, {
     DATA: () => DATA2,
