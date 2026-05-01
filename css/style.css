@@ -208,6 +208,7 @@ button.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !import
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
   min-height: calc(100vh - 52px);
+  position: relative;
 }
 
 .sidebar {
@@ -226,27 +227,18 @@ button.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !import
 .sidebar.collapsed {
   width: 0 !important;
   padding: 16px 0;
-  overflow: hidden;
   border-right: 1px solid transparent;
   min-width: 0;
 }
 .sidebar.collapsed .sidebar-inner {
-  opacity: 0;
+  visibility: hidden;
   pointer-events: none;
-}
-.sidebar.collapsed .sidebar-toggle {
-  right: -28px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-left: none;
-  border-radius: 0 6px 6px 0;
-  padding: 8px 6px;
-}
-.sidebar.collapsed .sidebar-toggle:hover {
-  background: var(--panel-hover);
 }
 .main.sidebar-collapsed {
   grid-template-columns: 0 1fr;
+}
+.main.sidebar-collapsed .sidebar-toggle {
+  left: 0;
 }
 .sidebar::-webkit-scrollbar { width: 4px; }
 .sidebar::-webkit-scrollbar-track { background: transparent; }
@@ -256,12 +248,12 @@ button.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !import
 .sidebar-toggle {
   position: absolute;
   top: 12px;
-  right: -1px;
-  z-index: 10;
+  left: var(--sidebar-w);
+  z-index: 100;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-right: none;
-  border-radius: 6px 0 0 6px;
+  border-left: none;
+  border-radius: 0 6px 6px 0;
   padding: 8px 5px;
   cursor: pointer;
   font-size: 10px;
@@ -275,7 +267,7 @@ button.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !import
   color: var(--text);
 }
 .sidebar-inner {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
 .content {
@@ -1297,10 +1289,11 @@ tr.subtotal:hover td, tr.subtotal-deep:hover td, tr.subtotal-deep3:hover td { fi
   .grid-3, .grid-4 { grid-template-columns: 1fr; }
   .grid-2 { grid-template-columns: 1fr; }
   .fab-group { bottom: 12px; right: 12px; }
+  .sidebar-toggle { display: none; }
 }
 
 @media print {
-  .topbar, .sidebar, .fab-group { display: none; }
+  .topbar, .sidebar, .sidebar-toggle, .fab-group { display: none; }
   .main { grid-template-columns: 1fr; }
   .page { display: block !important; page-break-after: always; }
 }

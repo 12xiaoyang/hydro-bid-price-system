@@ -404,7 +404,8 @@ const ImportWizard = {
         return val || `列${i + 1}`;
       });
       // Remove trailing empty columns (headers that are just placeholder + no data)
-      const data = json.slice(headerIdx + 1);
+      let data = json.slice(headerIdx + 1);
+
       let lastNonEmpty = rawHeaders.length - 1;
       while (lastNonEmpty >= 0) {
         const hasData = data.some(row => row[lastNonEmpty] !== undefined && String(row[lastNonEmpty]).trim() !== '');
