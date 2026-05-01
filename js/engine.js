@@ -235,7 +235,7 @@ function getFormulaMetaForField(dataKey, row, key, col, isSub) {
 }
 
 
-const FormulaEngine = {
+export const FormulaEngine = {
   // Auto-detect is_buy from sub_categories if null/undefined
   detectIsBuy(row) {
     if (row.is_buy !== null && row.is_buy !== undefined && row.is_buy !== '') return row.is_buy;

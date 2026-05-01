@@ -26,7 +26,7 @@ function _rowEditFieldOptions(col, key, dataKey) {
   return null;
 }
 
-function openRowEditModal(kind, payload) {
+export function openRowEditModal(kind, payload) {
   closeRowEditModal();
   const overlay = document.createElement('div');
   overlay.id = 'rowEditOverlay';
@@ -316,7 +316,7 @@ const close = () => closeRowEditModal();
   document.addEventListener('keydown', overlay._rowEditKeydown);
 }
 
-function closeRowEditModal() {
+export function closeRowEditModal() {
   const overlay = document.getElementById('rowEditOverlay');
   if (overlay) {
     if (overlay._rowEditKeydown) document.removeEventListener('keydown', overlay._rowEditKeydown);
@@ -325,7 +325,7 @@ function closeRowEditModal() {
 }
 
 // ============ 可编辑表格组件 ============
-const EditableTable = {
+export const EditableTable = {
   currentEdit: null,
 
   render(config) {

@@ -3,7 +3,7 @@
 // 依赖: SheetJS (xlsx) 库
 
 // ============ 所有表的字段定义 ============
-const TABLE_SCHEMAS = {
+export const TABLE_SCHEMAS = {
   water:    { label: '水轮机材料明细', group: '材料明细(BOM)', fields: [
     { key: 'category', label: '分类', type: 'text' },
     { key: 'seq', label: '序号', type: 'text' },
@@ -160,7 +160,7 @@ const TABLE_SCHEMAS = {
 };
 
 // ============ 字段别名（用于模糊匹配） ============
-const FIELD_ALIASES = {
+export const FIELD_ALIASES = {
   seq: ['序号','编号','序號','no','number','order','item','id','seq','序列号','顺序号','行号','行数'],
   name: ['名称','name','项目','项目名称','部件','零件','item','part','零件名称','部件名称','设备','设备名称','材料名称','物料名称','内容','说明'],
   category: ['分类','类别','category','材料分类','材料类别','品种','类型','type','种类','材料类型','材料品种','组别'],
@@ -199,7 +199,7 @@ const FIELD_ALIASES = {
 };
 
 // ============ 导入向导主对象 ============
-const ImportWizard = {
+export const ImportWizard = {
   _state: {
     step: 0,
     file: null,
@@ -841,6 +841,11 @@ const ImportWizard = {
       this._validateRow(row, this._state.targetTable, errors);
     });
 
+    // Fix truncated seq numbers (e.g., Excel General-format stores 9.10 as number 9.1, reads as "9.1")
+    if (['water','gen','valve','valve_door'].includes(this._state.targetTable)) {
+      this._fixTruncatedSeqs(parsedRows);
+    }
+
     // Detect duplicate seq for BOM tables (common: Excel stores 2.10 as number → JS reads 2.1)
     let dupSeqs = [];
     if (['water','gen','valve','valve_door'].includes(this._state.targetTable)) {
@@ -861,6 +866,55 @@ const ImportWizard = {
     this._state.errors = errors;
     this._state.validated = true;
     this._renderStep4_preview();
+  },
+
+  _fixTruncatedSeqs(rows) {
+    // Detect seq values truncated by Excel's General number format (e.g., 9.10 stored as number 9.1, read as "9.1")
+    // Heuristic: within a parent group, if a child's last segment decreases vs the previous child in file order,
+    // it was likely truncated. Reconstruct by incrementing the previous child's last segment.
+    const isNumeric = s => /^\d+(\.\d+)*$/.test(String(s));
+
+    // Group rows by parent seq (e.g., "9" for "9.1", "3.2" for "3.2.1")
+    const groups = {};
+    rows.forEach((row, idx) => {
+      const seq = String(row.seq || '').trim();
+      if (!seq || !isNumeric(seq)) return;
+      const parts = seq.split('.');
+      if (parts.length < 2) return;
+      const parent = parts.slice(0, -1).join('.');
+      if (!groups[parent]) groups[parent] = [];
+      groups[parent].push({ idx, row, seq, lastSeg: parseInt(parts[parts.length-1], 10) });
+    });
+
+    let fixedCount = 0;
+    Object.values(groups).forEach(children => {
+      children.sort((a, b) => a.idx - b.idx);
+      const seen = {};
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        const key = child.seq;
+        if (seen[key] !== undefined && i > 0) {
+          // Duplicate seq: second occurrence may be a truncated value
+          const prev = children[i - 1];
+          if (prev && prev.lastSeg > child.lastSeg) {
+            // Decrease detected — reconstruct: prefix + (prev.lastSeg + 1)
+            const prefix = child.seq.substring(0, child.seq.lastIndexOf('.') + 1);
+            const newLastSeg = prev.lastSeg + 1;
+            const newSeq = prefix + newLastSeg;
+            child.row.seq = newSeq;
+            child.seq = newSeq;
+            child.lastSeg = newLastSeg;
+            fixedCount++;
+          }
+        } else {
+          seen[key] = true;
+        }
+      }
+    });
+
+    if (fixedCount > 0) {
+      console.log('🔧 修复了 ' + fixedCount + ' 个因Excel数字格式丢失精度的序号');
+    }
   },
 
   _convertValue(val, fieldKey, schema) {
