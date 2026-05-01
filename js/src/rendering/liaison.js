@@ -1,6 +1,6 @@
 import { FormulaEngine } from '../calculation.js';
 import { _tableConfigs } from '../health.js';
-import { EditableTable } from '../../editor.js';
+import { EditableTable } from '../editor.js';
 
 export function renderLiaison() {
   FormulaEngine.recalcTable('liaison');

@@ -1,6 +1,6 @@
 import { state, FormulaEngine, hasAnyMachine, getAvailablePartsTabs, autoSwitchPartsTab, autoSwitchToolsTab } from '../calculation.js';
 import { _tableConfigs } from '../health.js';
-import { EditableTable } from '../../editor.js';
+import { EditableTable } from '../editor.js';
 
 export function renderParts() {
   // 自动切换到可用标签

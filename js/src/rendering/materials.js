@@ -1,7 +1,7 @@
 import { FormulaEngine, state } from '../calculation.js';
 import { _tableConfigs, showToast } from '../health.js';
 import { fixAllConsistency } from '../calculation.js';
-import { EditableTable } from '../../editor.js';
+import { EditableTable } from '../editor.js';
 import { resetDataTable } from '../persistence.js';
 
 export function renderMaterials() {

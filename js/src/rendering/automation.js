@@ -2,7 +2,7 @@ import { FormulaEngine, state } from '../calculation.js';
 import { DATA, escHtml, YUAN_TO_WAN } from '../data.js';
 import { fmt } from '../calculation.js';
 import { _tableConfigs } from '../health.js';
-import { EditableTable, openRowEditModal } from '../../editor.js';
+import { EditableTable, openRowEditModal } from '../editor.js';
 
 // ============ 渲染:自动化&监测 ============
 export const AUTO_GROUP_ORDER = ['水轮机自动化检测','发电机自动化检测','阀门自动化检测','备件自动化检测','工具自动化检测','辅助设备自动化检测'];

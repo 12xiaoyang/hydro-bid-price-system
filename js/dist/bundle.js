@@ -308,7 +308,7 @@
     return null;
   }
 
-  // js/editor.js
+  // js/src/editor.js
   function _escapeHtmlRowEdit(v) {
     return String(v ?? "").replace(/[&<>"']/g, (s) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[s]);
   }
@@ -1593,7 +1593,7 @@
     }
   };
 
-  // js/import-wizard.js
+  // js/src/import-wizard.js
   var TABLE_SCHEMAS = {
     water: { label: "\u6C34\u8F6E\u673A\u6750\u6599\u660E\u7EC6", group: "\u6750\u6599\u660E\u7EC6(BOM)", fields: [
       { key: "category", label: "\u5206\u7C7B", type: "text" },
